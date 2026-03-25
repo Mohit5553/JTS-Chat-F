@@ -59,7 +59,6 @@ export default function WebsiteManager() {
       domain: "",
       primaryColor: "#6366f1",
       accentColor: "#f59e0b",
-      accentColor: "#f59e0b",
       launcherIcon: "💬",
       awayMessage: "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
       isActive: true
@@ -72,7 +71,6 @@ export default function WebsiteManager() {
       websiteName: website.websiteName || "",
       domain: website.domain || "",
       primaryColor: website.primaryColor || "#6366f1",
-      accentColor: website.accentColor || "#f59e0b",
       accentColor: website.accentColor || "#f59e0b",
       launcherIcon: website.launcherIcon || "💬",
       awayMessage: website.awayMessage || "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
