@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Globe, Plus, Trash2, Copy, Check, Settings, Code } from "lucide-react";
-import { api } from "../api/client.js";
+import { api, API_BASE } from "../api/client.js";
 
 const COLOR_PRESETS = [
   { primary: "#6366f1", accent: "#4f46e5", name: "Indigo" },
@@ -349,11 +349,11 @@ export default function WebsiteManager() {
                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-60"></div>
                            <div className="text-slate-700 select-none hidden sm:block text-right pt-[1px]">1<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8</div>
                            <div className="text-emerald-100/90 whitespace-pre-wrap break-all w-full overflow-x-auto selection:bg-indigo-500/30">
-                              {website.embedScript}
+                              {`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`}
                            </div>
                         </div>
                         <button 
-                           onClick={() => handleCopy(website.embedScript, website._id)}
+                           onClick={() => handleCopy(`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`, website._id)}
                            className="absolute right-4 top-1/2 -translate-y-1/2 p-3.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl backdrop-blur-md shadow-xl hover:scale-110 active:scale-95 transition-all outline-none border border-white/5 disabled:opacity-50"
                         >
                            {copiedId === website._id ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
