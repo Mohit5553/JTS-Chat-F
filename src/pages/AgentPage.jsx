@@ -4,10 +4,16 @@ import { useSearchParams } from "react-router-dom";
 import { Ticket, Link, Copy, CheckCheck, X, History, AlertCircle } from "lucide-react";
 import Layout from "../components/Layout.jsx";
 import ChatPanel from "../components/ChatPanel.jsx";
+import CannedResponseManager from "../components/CannedResponseManager.jsx";
 import StatCard from "../components/StatCard.jsx";
+import PaginationControls from "../components/PaginationControls.jsx";
+import ActivityTimeline from "../components/ActivityTimeline.jsx";
 import { api, API_BASE } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { NotificationService } from "../utils/notifications.js";
+import { useSocket } from "../context/SocketContext.jsx";
+import { getPaginationMeta } from "../utils/pagination.js";
+import { hasModule } from "../utils/planAccess.js";
 
 function dedupeMessages(messages) {
   const seen = new Set();
@@ -21,26 +27,35 @@ function dedupeMessages(messages) {
 
 export default function AgentPage() {
   const { user, setUser } = useAuth();
+  const isBasicUser = user?.role === "user";
+  const canUseTickets = hasModule(user, "tickets");
+  const canUseShortcuts = hasModule(user, "shortcuts");
   const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab") || "dashboard";
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [messages, setMessages] = useState([]);
-  const [socket, setSocket] = useState(null);
+  const socket = useSocket();
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [sessionSearch, setSessionSearch] = useState("");
   const [typingSessions, setTypingSessions] = useState({});
   const [ticketModal, setTicketModal] = useState(false);
-  const [ticketForm, setTicketForm] = useState({ subject: "", priority: "medium" });
+  const [ticketForm, setTicketForm] = useState({ subject: "", priority: "medium", crmStage: "none" });
   const [ticketResult, setTicketResult] = useState(null);
   const [ticketSaving, setTicketSaving] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   
-  const [visitorHistory, setVisitorHistory] = useState(null);
+  const [customerHistory, setCustomerHistory] = useState(null);
   const [historyModal, setHistoryModal] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [sessionActivity, setSessionActivity] = useState([]);
   const [sessionTab, setSessionTab] = useState("active");
+  const [chatPage, setChatPage] = useState(1);
+  const [dashboardPage, setDashboardPage] = useState(1);
+  const [categories, setCategories] = useState([]);
+  const [selectedCat, setSelectedCat] = useState("");
+  const [selectedSub, setSelectedSub] = useState("");
 
   const selectedSession = useMemo(() => sessions.find((session) => session.sessionId === selectedSessionId) || null, [sessions, selectedSessionId]);
   const selectedSessionIdRef = useRef(selectedSessionId);
@@ -68,13 +83,14 @@ export default function AgentPage() {
     NotificationService.requestPermission();
   }, []);
 
-  const loadVisitorHistory = async (sessionId) => {
+  const loadCustomerHistory = async (crn) => {
+    if (!crn || !canUseTickets) return;
     setLoadingHistory(true);
     try {
-      const data = await api(`/api/tickets/visitor-history/${sessionId}`);
-      setVisitorHistory(data);
+      const data = await api(`/api/tickets/customer-history/${crn}`);
+      setCustomerHistory(data);
     } catch (err) {
-      console.warn("Failed to load visitor history:", err);
+      console.warn("Failed to load customer history:", err);
     } finally {
       setLoadingHistory(false);
     }
@@ -82,44 +98,42 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (!selectedSessionId) {
-      setVisitorHistory(null);
+      setCustomerHistory(null);
       return;
     }
     api(`/api/chat/sessions/${selectedSessionId}/messages`).then(setMessages).catch((err) => setToast({ show: true, message: err.message, type: "error" }));
-    loadVisitorHistory(selectedSessionId);
-  }, [selectedSessionId]);
+    api(`/api/chat/sessions/${selectedSessionId}/activity`).then(setSessionActivity).catch(() => setSessionActivity([]));
+    if (selectedSession && selectedSession.crn) {
+      loadCustomerHistory(selectedSession.crn);
+    } else {
+      setCustomerHistory(null);
+    }
+    if (ticketModal && selectedSession?.websiteId?._id) {
+       api(`/api/categories?websiteId=${selectedSession.websiteId._id}`).then(setCategories).catch(err => console.warn("Categories failed", err));
+    }
+  }, [selectedSessionId, selectedSession?.crn, ticketModal, selectedSession?.websiteId?._id]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!socket) return;
 
-    const nextSocket = io(API_BASE, {
-      auth: {
-        type: "agent",
-        userId: user._id || user.id
-      },
-      transports: ["websocket"]
-    });
-
-    nextSocket.on("connect_error", () => {
+    socket.on("connect_error", () => {
       setToast({ show: true, message: "Live connection interrupted. Auto-reconnecting...", type: "error" });
     });
 
-    nextSocket.on("connect", () => {
+    socket.on("connect", () => {
       setToast({ show: false, message: "", type: "info" });
       setUser(prev => ({ ...prev, isOnline: true }));
     });
 
-    nextSocket.on("chat:new-message", (payload) => {
+    socket.on("chat:new-message", (payload) => {
       loadSessions();
       if (payload.sender === "visitor") {
         NotificationService.notify(`Message from ${payload.sessionId.substring(0, 8)}`, payload.message);
         
-        // Mark as read if currently looking at this chat
         if (payload.sessionId === selectedSessionIdRef.current) {
-          nextSocket.emit("chat:history:read", { sessionId: payload.sessionId });
+          socket.emit("chat:history:read", { sessionId: payload.sessionId });
         }
         
-        // Subtle message sound
         try {
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const osc = ctx.createOscillator();
@@ -138,30 +152,41 @@ export default function AgentPage() {
       }
     });
 
-    nextSocket.on("chat:message", (payload) => {
+    socket.on("chat:message", (payload) => {
       if (payload.sessionId === selectedSessionIdRef.current) {
-        setMessages((current) => dedupeMessages([...current, payload]));
+        setMessages((current) => {
+          const pendingIdx = current.findIndex(m => m.isPending && (m._id === payload.tempId || (m.sender === payload.sender && m.message === payload.message)));
+          if (pendingIdx !== -1) {
+            const copy = [...current];
+            copy[pendingIdx] = { ...payload, isPending: false };
+            return dedupeMessages(copy);
+          }
+          return dedupeMessages([...current, payload]);
+        });
       }
     });
 
-    nextSocket.on("chat:typing", ({ sessionId, isTyping, sender }) => {
+    socket.on("chat:typing", ({ sessionId, isTyping, sender }) => {
       if (sender === "visitor") {
         setTypingSessions(prev => ({ ...prev, [sessionId]: isTyping }));
       }
     });
 
-    nextSocket.on("chat:read", ({ sessionId }) => {
+    socket.on("chat:delivered", ({ messageId }) => {
+      setMessages(prev => prev.map(m => (m._id === messageId ? { ...m, deliveredAt: new Date() } : m)));
+    });
+
+    socket.on("chat:read", ({ sessionId }) => {
       if (sessionId === selectedSessionIdRef.current) {
         setMessages(prev => prev.map(m => (!m.readAt ? { ...m, readAt: new Date() } : m)));
       }
     });
 
-    nextSocket.on("chat:assigned", ({ sessionId }) => {
+    socket.on("chat:assigned", ({ sessionId }) => {
       loadSessions();
       if (!selectedSessionId) {
         setSelectedSessionId(sessionId);
       }
-      // Sound notification ping
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
@@ -177,9 +202,28 @@ export default function AgentPage() {
       NotificationService.notify("New Chat Assigned", "You have a new visitor waiting for support.");
     });
 
-    setSocket(nextSocket);
-    return () => nextSocket.close();
-  }, [user?._id]);
+    socket.on("visitor:status", ({ sessionId, isOnline, lastActiveAt }) => {
+      setSessions(prev => prev.map(s => {
+        const targetId = sessionId || selectedSessionIdRef.current;
+        if (s.sessionId === targetId) {
+          return { ...s, visitorId: { ...s.visitorId, isOnline, lastVisitTime: lastActiveAt } };
+        }
+        return s;
+      }));
+    });
+
+    return () => {
+      socket.off("connect_error");
+      socket.off("connect");
+      socket.off("chat:new-message");
+      socket.off("chat:message");
+      socket.off("chat:typing");
+      socket.off("chat:delivered");
+      socket.off("chat:read");
+      socket.off("chat:assigned");
+      socket.off("visitor:status");
+    };
+  }, [user?._id, socket]);
 
   useEffect(() => {
     if (socket && selectedSessionId) {
@@ -195,7 +239,6 @@ export default function AgentPage() {
         isAvailable: !user.isAvailable
       })
     });
-
     setUser(updated);
   }
 
@@ -217,14 +260,32 @@ export default function AgentPage() {
 
   function sendMessage(payload) {
     if (!socket || !selectedSessionId) return;
-    if (typeof payload === 'string') {
-      socket.emit("agent:message", { sessionId: selectedSessionId, message: payload });
+
+    const messageText = typeof payload === 'string' ? payload : (payload.text || "Sent an attachment");
+    
+    const tempMsg = {
+      _id: `temp-${Date.now()}`,
+      sessionId: selectedSessionId,
+      message: messageText,
+      attachmentUrl: payload.attachmentUrl,
+      attachmentType: payload.attachmentType,
+      sender: "agent",
+      senderName: user.name || "Support",
+      createdAt: new Date().toISOString(),
+      agentId: user._id,
+      isPending: true
+    };
+    setMessages(prev => dedupeMessages([...prev, tempMsg]));
+
+    if (typeof payload === "string") {
+      socket.emit("agent:message", { sessionId: selectedSessionId, message: payload, tempId: tempMsg._id });
     } else {
-      socket.emit("agent:message", { 
-        sessionId: selectedSessionId, 
-        message: payload.text || "Sent an attachment",
+      socket.emit("agent:message", {
+        sessionId: selectedSessionId,
+        message: messageText,
         attachmentUrl: payload.attachmentUrl,
-        attachmentType: payload.attachmentType
+        attachmentType: payload.attachmentType,
+        tempId: tempMsg._id
       });
     }
   }
@@ -251,11 +312,16 @@ export default function AgentPage() {
         body: JSON.stringify({
           sessionId: selectedSession._id,
           subject: ticketForm.subject || `Support – ${selectedSession.websiteId?.websiteName || 'Chat'}`,
-          priority: ticketForm.priority
+          priority: ticketForm.priority,
+          crmStage: ticketForm.crmStage,
+          category: selectedCat || undefined,
+          subcategory: selectedSub || undefined
         })
       });
       setTicketResult(result);
-      setTicketForm({ subject: "", priority: "medium" });
+      setTicketForm({ subject: "", priority: "medium", crmStage: "none" });
+      setSelectedCat("");
+      setSelectedSub("");
       loadSessions();
     } catch (err) {
       setToast({ show: true, message: err.message, type: "error" });
@@ -277,6 +343,9 @@ export default function AgentPage() {
     { label: "Active Queue", href: "/agent?tab=chats" },
     { label: "Settings", href: "/agent?tab=settings" }
   ];
+  if (!isBasicUser && canUseShortcuts) {
+    menuItems.splice(2, 0, { label: "Shortcuts", href: "/agent?tab=shortcuts" });
+  }
 
   const searchedSessions = sessionSearch
     ? sessions.filter(s =>
@@ -287,11 +356,20 @@ export default function AgentPage() {
 
   const activeSessions  = searchedSessions.filter(s => s.status === "active" || s.status === "queued");
   const closedSessions  = searchedSessions.filter(s => s.status === "closed");
-  // "Trash" = closed sessions older than 7 days
   const trashSessions   = closedSessions.filter(s => new Date() - new Date(s.closedAt || s.updatedAt) > 7 * 86400000);
 
   const sessionTabMap = { active: activeSessions, closed: closedSessions, trash: trashSessions };
   const visibleSessions = sessionTabMap[sessionTab] ?? activeSessions;
+  const paginatedVisibleSessions = getPaginationMeta(visibleSessions, chatPage);
+  const paginatedDashboardSessions = getPaginationMeta(sessions, dashboardPage);
+
+  useEffect(() => {
+    setChatPage(1);
+  }, [sessionTab, sessionSearch, sessions.length]);
+
+  useEffect(() => {
+    setDashboardPage(1);
+  }, [sessions.length]);
 
   const SESSION_TABS = [
     { key: "active",  label: "Active",  count: activeSessions.length,  dot: "bg-emerald-500" },
@@ -302,7 +380,6 @@ export default function AgentPage() {
   const content = tab === "chats" ? (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[700px] animate-in slide-in-from-bottom-4 duration-700">
       <div className="lg:col-span-4 premium-card overflow-hidden flex flex-col p-0 border-none shadow-2xl">
-        {/* Header */}
         <div className="p-6 border-b border-slate-50 flex items-center justify-between">
           <div className="flex flex-col gap-0.5">
             <h3 className="heading-md">My Chats</h3>
@@ -321,7 +398,6 @@ export default function AgentPage() {
           </button>
         </div>
 
-        {/* Status Tabs */}
         <div className="flex border-b border-slate-100 bg-slate-50/40">
           {SESSION_TABS.map(t => (
             <button
@@ -342,7 +418,6 @@ export default function AgentPage() {
           ))}
         </div>
 
-        {/* Search */}
         <div className="px-4 pt-3 pb-2">
           <input
             value={sessionSearch}
@@ -352,7 +427,6 @@ export default function AgentPage() {
           />
         </div>
 
-        {/* Session List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/30">
           {loadingSessions ? (
             Array.from({ length: 3 }).map((_, i) => (
@@ -361,7 +435,7 @@ export default function AgentPage() {
                 <div className="h-2 bg-slate-100 rounded-lg w-1/2" />
               </div>
             ))
-          ) : visibleSessions.map((session) => (
+          ) : paginatedVisibleSessions.pageItems.map((session) => (
             <div
               key={session._id}
               onClick={() => setSelectedSessionId(session.sessionId)}
@@ -377,6 +451,11 @@ export default function AgentPage() {
                   <strong className={`text-[10px] font-black tracking-wide block uppercase transition-colors ${ selectedSessionId === session.sessionId ? 'text-indigo-600' : 'text-slate-900'}`}>
                     {session.websiteId?.websiteName || "—"}
                   </strong>
+                  {session.crn && (
+                    <span className="text-[7px] font-black bg-purple-50 text-purple-500 px-1.5 py-0.5 rounded border border-purple-100 uppercase tracking-tighter">
+                      {session.crn}
+                    </span>
+                  )}
                   <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
                     session.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                     session.status === 'queued' ? 'bg-amber-50 text-amber-600 border-amber-100' :
@@ -392,70 +471,80 @@ export default function AgentPage() {
                 {typingSessions[session.sessionId] && (
                   <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest animate-pulse">typing...</p>
                 )}
-                {(session.status === 'closed') && session.closedAt && (
-                  <p className="text-[8px] text-slate-300 font-bold">
-                    Closed {new Date(session.closedAt).toLocaleDateString()}
-                  </p>
-                )}
               </div>
             </div>
           ))}
-          {!loadingSessions && visibleSessions.length === 0 && (
-            <div className="text-center py-16 text-slate-400 font-black text-[10px] uppercase tracking-widest flex flex-col items-center gap-3">
-              <div className="w-10 h-10 rounded-full border border-dashed border-slate-200 flex items-center justify-center text-lg">
-                {sessionTab === 'active' ? '😴' : sessionTab === 'closed' ? '✅' : '🗑️'}
-              </div>
-              No {sessionTab} sessions.
-            </div>
-          )}
         </div>
+        {!loadingSessions && (
+          <div className="px-3 pb-3">
+            <PaginationControls
+              currentPage={paginatedVisibleSessions.currentPage}
+              totalPages={paginatedVisibleSessions.totalPages}
+              totalItems={paginatedVisibleSessions.totalItems}
+              itemLabel="sessions"
+              onPageChange={setChatPage}
+            />
+          </div>
+        )}
       </div>
 
-        <div className="lg:col-span-8 flex flex-col gap-8">
-          <ChatPanel 
-             session={selectedSession} 
-             messages={messages} 
-             onSend={sendMessage} 
-             onTyping={sendTyping} 
-             isTyping={typingSessions[selectedSession?.sessionId]} 
-             disabled={!user?.isAvailable} 
-          />
-          
-          {selectedSession && selectedSession.status !== "closed" && (
-            <div className="premium-card p-8 flex items-center justify-between gap-6 animate-in zoom-in-95 duration-500">
-              <div className="space-y-1">
-                <h3 className="heading-md">Session Control</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Convert this chat to a ticket or close the session.</p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setHistoryModal(true)}
-                  className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm flex items-center gap-2 relative"
-                >
-                  <History size={14} /> Visitor Intel
-                  {visitorHistory?.hasOpenTickets && (
-                    <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full shadow-lg shadow-red-500/50 animate-pulse" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setTicketModal(true); setTicketResult(null); }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
-                >
-                  <Ticket size={14} /> Generate Ticket
-                </button>
-                <button
-                  type="button"
-                  onClick={closeChat}
-                  className="bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-100 text-slate-500 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all"
-                >
-                  Close Session
-                </button>
-              </div>
+      <div className="lg:col-span-8 flex flex-col gap-8">
+        <ChatPanel 
+           session={selectedSession} 
+           messages={messages} 
+           onSend={sendMessage}
+           onTyping={sendTyping}
+           isTyping={typingSessions[selectedSessionId]}
+           onConvertToTicket={isBasicUser || !canUseTickets ? null : () => { setTicketModal(true); setTicketResult(null); }}
+           canUseShortcuts={!isBasicUser && canUseShortcuts}
+           disabled={!user?.isAvailable} 
+        />
+        
+        {selectedSession && selectedSession.status !== "closed" && (
+          <div className="premium-card p-8 flex items-center justify-between gap-6 animate-in zoom-in-95 duration-500">
+            <div className="space-y-1">
+              <h3 className="heading-md">Session Control</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                {isBasicUser ? "Reply to and close your assigned chats." : "Convert this chat to a ticket or close the session."}
+              </p>
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {!isBasicUser ? (
+                <>
+                  {canUseTickets ? (
+                    <button
+                      type="button"
+                      onClick={() => setHistoryModal(true)}
+                      className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm flex items-center gap-2 relative"
+                    >
+                      <History size={14} /> Customer Profile
+                      {customerHistory?.tickets?.some(t => t.status === 'open') && (
+                        <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full shadow-lg shadow-red-500/50 animate-pulse" />
+                      )}
+                    </button>
+                  ) : null}
+                  {canUseTickets ? (
+                    <button
+                      type="button"
+                      onClick={() => { setTicketModal(true); setTicketResult(null); }}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
+                    >
+                      <Ticket size={14} /> Generate Ticket
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+              <button
+                type="button"
+                onClick={closeChat}
+                className="bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-100 text-slate-500 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all"
+              >
+                Close Session
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </section>
   ) : tab === "settings" ? (
       <section className="max-w-xl animate-in slide-in-from-bottom-4 duration-700">
@@ -464,7 +553,6 @@ export default function AgentPage() {
               <h3 className="heading-md">Security Identity</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Manage your personal platform credentials.</p>
            </div>
-
            <div className="space-y-5">
               <div className="space-y-1.5">
                   <label className="small-label">Display Name</label>
@@ -496,33 +584,38 @@ export default function AgentPage() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
                     placeholder="Leave blank to keep unchanged"
                   />
-                  <p className="text-[9px] font-black uppercase text-amber-500 tracking-widest mt-2 flex items-center gap-1.5">
-                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                     Require immediate re-authentication after change
-                  </p>
               </div>
            </div>
-
            <button type="submit" className="w-full bg-slate-950 hover:bg-black text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center justify-center">
               Synchronize Identity Profile
            </button>
         </form>
+      </section>
+  ) : tab === "shortcuts" && !isBasicUser && canUseShortcuts ? (
+      <section className="animate-in slide-in-from-bottom-4 duration-700">
+        <CannedResponseManager />
+      </section>
+  ) : tab === "shortcuts" && !isBasicUser && !canUseShortcuts ? (
+      <section className="animate-in slide-in-from-bottom-4 duration-700">
+        <div className="rounded-[40px] border border-indigo-100 bg-indigo-50 p-12 text-center">
+          <h3 className="text-lg font-black text-indigo-900 uppercase tracking-tight">Shortcuts not included</h3>
+          <p className="mt-3 text-sm font-bold text-indigo-700">This client package does not include the shortcuts module.</p>
+        </div>
       </section>
   ) : (
     <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             <StatCard label="Assigned Load" value={sessions.length.toLocaleString()} />
             <StatCard label="Network Identity" value={user?.isOnline ? "Verified Online" : "Disconnected"} hint="Active Presence" />
-            <StatCard label="Global Waiting" value={sessions.filter((session) => session.status === "queued").length.toLocaleString()} />
+            <StatCard label="Avg Response" value={sessions.length > 0 ? "Under 30s" : "0s"} trend="Your Target SLA" color="indigo" />
         </section>
-
         <section className="premium-card p-10 space-y-10">
              <div className="flex flex-col gap-1">
                 <h3 className="heading-md">Health Monitoring</h3>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Real-time status of your assigned ecosystem.</p>
              </div>
              <div className="grid grid-cols-1 gap-4">
-                 {sessions.map(s => (
+                 {paginatedDashboardSessions.pageItems.map(s => (
                      <div key={s._id} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
                          <div className="flex items-center gap-5">
                              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">🌐</div>
@@ -537,8 +630,14 @@ export default function AgentPage() {
                          </div>
                      </div>
                  ))}
-                 {!sessions.length && <div className="text-center py-12 text-slate-400 font-black text-[10px] uppercase tracking-widest">Queue is currently clear.</div>}
              </div>
+             <PaginationControls
+               currentPage={paginatedDashboardSessions.currentPage}
+               totalPages={paginatedDashboardSessions.totalPages}
+               totalItems={paginatedDashboardSessions.totalItems}
+               itemLabel="sessions"
+               onPageChange={setDashboardPage}
+             />
         </section>
     </div>
   );
@@ -547,20 +646,17 @@ export default function AgentPage() {
     <Layout title={tab === "chats" ? "Operation Room" : tab === "settings" ? "Agent Settings" : "Command Center"} subtitle={tab === "chats" ? "Manage and resolve active visitor streams" : tab === "settings" ? "Manage your system identity" : "High-level performance metrics"} menuItems={menuItems}>
       {toast.show && (
         <div className="fixed bottom-10 right-10 bg-slate-900 border border-slate-800 text-white shadow-2xl px-6 py-4 rounded-2xl text-[12px] font-bold flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-500 z-50">
-          <span className={`w-2.5 h-2.5 rounded-full ${toast.type === "error" ? "bg-red-500 animate-pulse" : "bg-indigo-500"} shadow-[0_0_10px_rgba(239,68,68,0.5)]`}></span>
+          <span className={`w-2.5 h-2.5 rounded-full ${toast.type === "error" ? "bg-red-500 animate-pulse" : "bg-indigo-500"}`}></span>
           {toast.message}
           <button onClick={() => setToast({ show: false, message: "", type: "info" })} className="ml-4 text-slate-400 hover:text-white transition-colors">✕</button>
         </div>
       )}
       {content}
 
-      {/* Generate Ticket Modal */}
       {ticketModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => { setTicketModal(false); setTicketResult(null); }} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden">
-            
-            {/* Modal Header */}
             <div className="p-8 border-b border-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
@@ -568,7 +664,6 @@ export default function AgentPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Generate Support Ticket</h3>
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Convert this chat session into a trackable ticket</p>
                 </div>
               </div>
               <button onClick={() => { setTicketModal(false); setTicketResult(null); }} className="p-2 text-slate-300 hover:text-slate-700 hover:bg-slate-50 rounded-xl transition-all">
@@ -577,13 +672,11 @@ export default function AgentPage() {
             </div>
 
             {ticketResult ? (
-              // Success State
               <div className="p-8 space-y-6 text-center">
                 <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto">
                   <CheckCheck size={28} className="text-emerald-500" />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ticket Created</p>
                   <h4 className="text-xl font-black text-slate-900">{ticketResult.ticketId}</h4>
                   <p className="text-xs text-slate-500 font-bold mt-1">{ticketResult.subject}</p>
                 </div>
@@ -598,7 +691,6 @@ export default function AgentPage() {
                       {copiedLink ? <CheckCheck size={13} className="text-emerald-500" /> : <Copy size={13} />}
                     </button>
                   </div>
-                  <p className="text-[9px] text-slate-400 font-bold">Share this link with the visitor to track their ticket status.</p>
                 </div>
                 <button
                   onClick={() => { setTicketModal(false); setTicketResult(null); }}
@@ -608,17 +700,36 @@ export default function AgentPage() {
                 </button>
               </div>
             ) : (
-              // Form State
               <form onSubmit={generateTicket} className="p-8 space-y-6">
-                {selectedSession && (
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xs font-black">💬</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black text-slate-700 uppercase tracking-wide">{selectedSession.websiteId?.websiteName}</p>
-                      <p className="text-[9px] text-slate-400 font-bold truncate">{selectedSession.visitorId?.visitorId}</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pipeline Category</label>
+                     <select 
+                        value={selectedCat} 
+                        onChange={(e) => {
+                           setSelectedCat(e.target.value);
+                           setSelectedSub("");
+                        }}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500"
+                     >
+                        <option value="">Uncategorized</option>
+                        {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
+                     </select>
                   </div>
-                )}
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-Tier</label>
+                     <select 
+                        value={selectedSub} 
+                        onChange={(e) => setSelectedSub(e.target.value)}
+                        disabled={!selectedCat}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 disabled:opacity-50"
+                     >
+                        <option value="">Select Sub-tier</option>
+                        {categories.find(c => c.name === selectedCat)?.subcategories?.map(s => <option key={s} value={s}>{s}</option>)}
+                     </select>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Ticket Subject</label>
                   <input
@@ -641,6 +752,23 @@ export default function AgentPage() {
                     <option value="urgent">🔴 Urgent — Critical problem</option>
                   </select>
                 </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">CRM Sales Stage</label>
+                  <select
+                    value={ticketForm.crmStage}
+                    onChange={e => setTicketForm(f => ({ ...f, crmStage: e.target.value }))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                  >
+                    <option value="none">🛠️ Standard Support</option>
+                    <option value="lead">✨ New Lead</option>
+                    <option value="qualified">💎 Qualified</option>
+                    <option value="opportunity">🚀 Opportunity</option>
+                    <option value="won">🏆 Won</option>
+                    <option value="lost">❌ Lost</option>
+                  </select>
+                </div>
+
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setTicketModal(false)} className="flex-1 border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-[0.2em] py-4 rounded-2xl hover:bg-slate-50 transition-all">
                     Cancel
@@ -660,20 +788,18 @@ export default function AgentPage() {
         </div>
       )}
 
-      {/* Visitor History Modal */}
       {historyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setHistoryModal(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl h-full max-h-[85vh] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 flex flex-col overflow-hidden">
-            
             <div className="p-8 border-b border-slate-50 flex items-center justify-between shrink-0 bg-slate-50/50">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-white border border-slate-200 rounded-2xl flex items-center justify-center shadow-sm">
                   <History size={20} className="text-indigo-600" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">Visitor Intelligence</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Historical interactions & tickets</p>
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Customer Intelligence</h3>
+                  {selectedSession?.crn && <span className="text-[9px] font-black text-purple-500 uppercase tracking-[0.3em]">{selectedSession.crn}</span>}
                 </div>
               </div>
               <button onClick={() => setHistoryModal(false)} className="p-2 text-slate-300 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all">
@@ -685,71 +811,158 @@ export default function AgentPage() {
               {loadingHistory ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-300">
                   <span className="animate-spin w-8 h-8 border-4 border-indigo-100 border-t-indigo-500 rounded-full mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Compiling records...</p>
                 </div>
-              ) : visitorHistory ? (
+              ) : customerHistory ? (
                 <>
-                  {visitorHistory.hasOpenTickets && (
-                    <div className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl flex items-center gap-4">
-                      <AlertCircle className="text-red-500" size={20} />
-                      <div>
-                        <p className="text-xs font-black text-red-700 uppercase tracking-wide">Attention Required</p>
-                        <p className="text-[10px] font-bold text-red-500 mt-0.5">This visitor currently has an unresolved support ticket open.</p>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Visitor</span>
-                      <p className="text-sm font-black text-slate-800">{visitorHistory.visitor?.name || "Anonymous"}</p>
-                      <p className="text-[10px] text-slate-500 font-bold truncate">{visitorHistory.visitor?.email || "No email"}</p>
+                    <div className="p-5 border border-purple-100 rounded-2xl bg-purple-50/30">
+                      <p className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1">Customer CRN</p>
+                      <p className="text-sm font-black text-purple-900">{selectedSession?.crn || "NOT ASSIGNED"}</p>
                     </div>
                     <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Total Chat Sessions</span>
-                      <p className="text-2xl font-black text-indigo-600 leading-none mt-1">{visitorHistory.pastSessions}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Session Identity</p>
+                      <p className="text-sm font-black text-slate-800">{selectedSession?.visitorId?.name || "Anonymous"}</p>
+                      <p className="text-[10px] text-slate-500 font-bold truncate">{selectedSession?.visitorId?.email || "No email"}</p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Ticket History ({visitorHistory.tickets?.length || 0})</h4>
-                    
-                    {visitorHistory.tickets?.length > 0 ? (
-                      <div className="space-y-3">
-                        {visitorHistory.tickets.map(ticket => (
-                          <div key={ticket._id} className="p-5 border border-slate-100 rounded-2xl hover:border-slate-200 transition-colors">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-2 py-1 rounded tracking-widest">{ticket.ticketId}</span>
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border ${ticket.status === 'open' || ticket.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>
-                                  {ticket.status}
-                                </span>
-                              </div>
-                              <span className="text-[9px] font-bold text-slate-400">{new Date(ticket.createdAt).toLocaleDateString()}</span>
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center justify-between">
+                      <span>Ticket History</span>
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-500">{customerHistory.tickets?.length || 0}</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {customerHistory.tickets?.length > 0 ? customerHistory.tickets.map(ticket => (
+                        <div key={ticket._id} className="p-5 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-indigo-100 transition-all">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-3">
+                              <span className="bg-indigo-50 text-indigo-700 text-[9px] font-black px-2 py-1 rounded tracking-widest">{ticket.ticketId}</span>
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border ${ticket.status === 'open' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{ticket.status}</span>
                             </div>
-                            <p className="text-xs font-black text-slate-800 mb-1">{ticket.subject}</p>
-                            {ticket.lastMessagePreview && (
-                              <p className="text-[10px] text-slate-500 font-medium italic mb-3 line-clamp-2">{ticket.lastMessagePreview}</p>
-                            )}
-                            <div className="flex items-center gap-4 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                              <span>Priority: <span className="text-slate-600">{ticket.priority}</span></span>
-                              <span>Agent: <span className="text-slate-600">{ticket.assignedAgent?.name || "Unassigned"}</span></span>
-                            </div>
+                            <p className="text-xs font-bold text-slate-700">{ticket.subject}</p>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] font-bold text-slate-400 italic text-center py-6">No previous tickets found for this visitor.</p>
-                    )}
+                          <div className="text-right">
+                             <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      )) : (
+                        <p className="text-[10px] text-slate-400 text-center py-4 font-bold uppercase">No tickets found for this CRN</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2 flex items-center justify-between">
+                      <span>Chat Interactions</span>
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-500">{customerHistory.sessions?.length || 0}</span>
+                    </h4>
+                    <div className="space-y-3">
+                      {customerHistory.sessions?.length > 0 ? customerHistory.sessions.map(s => (
+                        <div key={s._id} className="p-4 border border-slate-50 rounded-2xl bg-slate-50/50 flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-xs">💬</div>
+                              <div>
+                                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{s.websiteId?.websiteName}</p>
+                                 <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{s.lastMessagePreview || "No messages"}</p>
+                              </div>
+                           </div>
+                           <span className="text-[8px] font-black text-slate-300">{new Date(s.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      )) : (
+                        <p className="text-[10px] text-slate-400 text-center py-4 font-bold uppercase">No previous chats recorded</p>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : (
-                <div className="text-center py-20 text-slate-400 font-black text-[10px] uppercase tracking-widest">
-                  Could not load visitor intel.
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Visitor Name</p>
+                      <p className="text-sm font-black text-slate-900">{selectedSession?.visitorId?.name || "Anonymous Visitor"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">Live chat visitor profile</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Visitor Email</p>
+                      <p className="text-sm font-black text-slate-900 break-all">{selectedSession?.visitorId?.email || "No email shared yet"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">Captured from the visitor session</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Visitor ID</p>
+                      <p className="text-sm font-black text-slate-900 break-all">{selectedSession?.visitorId?.visitorId || "Unavailable"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">Session identity reference</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Current CRN</p>
+                      <p className="text-sm font-black text-slate-900">{selectedSession?.crn || "Not Assigned"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">CRM customer record has not been created yet</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Browser / Device</p>
+                      <p className="text-sm font-black text-slate-900">
+                        {[selectedSession?.visitorId?.browser, selectedSession?.visitorId?.os].filter(Boolean).join(" / ") || "Not detected"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">{selectedSession?.visitorId?.device || "Unknown device"}</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Location</p>
+                      <p className="text-sm font-black text-slate-900">
+                        {[selectedSession?.visitorId?.city, selectedSession?.visitorId?.country].filter(Boolean).join(", ") || selectedSession?.visitorId?.country || "Unknown"}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">{selectedSession?.visitorId?.timezone || "Timezone unavailable"}</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">IP Address</p>
+                      <p className="text-sm font-black text-slate-900 break-all">{selectedSession?.visitorId?.ipAddress || "Unavailable"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">Captured from visitor connection</p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Page</p>
+                      <p className="text-sm font-black text-slate-900 break-all">{selectedSession?.currentPage || "Unavailable"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">
+                        First visit: {selectedSession?.visitorId?.firstVisitTime ? new Date(selectedSession.visitorId.firstVisitTime).toLocaleString() : "Unknown"}
+                      </p>
+                    </div>
+                    <div className="p-5 border border-slate-100 rounded-2xl bg-slate-50">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Journey Entry</p>
+                      <p className="text-sm font-black text-slate-900 break-all">{selectedSession?.firstPage || "Unavailable"}</p>
+                      <p className="text-[10px] text-slate-400 font-bold mt-2">Unread queue count: {selectedSession?.unreadCount || 0}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Visitor Journey Timeline</h4>
+                    <div className="rounded-3xl border border-slate-100 bg-white p-5">
+                      <ActivityTimeline items={sessionActivity} emptyLabel="No chat session activity recorded yet." />
+                    </div>
+                    {(selectedSession?.visitHistory || []).length > 0 ? (
+                      <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Visited Pages</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {selectedSession.visitHistory.map((page, index) => (
+                            <span key={`${page}-${index}`} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[9px] font-black text-slate-600">
+                              {page}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="p-6 border border-dashed border-slate-200 rounded-3xl bg-slate-50/70 text-center text-slate-300">
+                    <div className="w-16 h-16 rounded-3xl bg-white border border-slate-100 flex items-center justify-center mx-auto mb-5">
+                      <History size={26} className="text-slate-300" />
+                    </div>
+                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                      No Customer Intelligence Available
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-bold mt-3 max-w-md leading-relaxed mx-auto">
+                      This visitor is visible here, but the chat is not linked to a CRM customer yet. Customer Intelligence becomes richer after a CRN/customer record or ticket history is created.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
-
             <div className="p-6 border-t border-slate-50 bg-slate-50/50 shrink-0">
                <button onClick={() => setHistoryModal(false)} className="w-full bg-slate-900 hover:bg-black text-white px-6 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Close Intelligence Tool</button>
             </div>
@@ -759,4 +972,3 @@ export default function AgentPage() {
     </Layout>
   );
 }
-

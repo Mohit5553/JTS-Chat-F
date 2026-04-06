@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 function destinationForRole(role) {
-  if (role === "agent") return "/agent";
+  if (["agent", "user"].includes(role)) return "/agent";
+  if (role === "sales") return "/sales";
+  if (role === "manager") return "/manager";
   if (role === "admin") return "/admin";
   return "/client";
 }
@@ -15,6 +17,8 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,8 +29,14 @@ export default function LoginPage() {
 
     try {
       const user = mode === "login"
-        ? await login(email, password)
+        ? await login(email, password, twoFactorCode)
         : await register({ name, email, password, role: "client" });
+
+      if (user?.twoFactorRequired) {
+        setNeedsTwoFactor(true);
+        setError("Enter your 6-digit authenticator code to finish signing in.");
+        return;
+      }
 
       navigate(destinationForRole(user.role));
     } catch (err) {
@@ -113,6 +123,19 @@ export default function LoginPage() {
                 required
             />
           </div>
+          {mode === "login" && needsTwoFactor && (
+            <div className="space-y-1.5">
+              <label className="small-label">Authenticator Code</label>
+              <input
+                value={twoFactorCode}
+                onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                inputMode="numeric"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xs font-bold tracking-[0.3em] focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+                required
+              />
+            </div>
+          )}
         </div>
 
         {error && (

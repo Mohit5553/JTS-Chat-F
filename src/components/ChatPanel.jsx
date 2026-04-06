@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "../api/client.js";
-import { Paperclip, FileText, Image as ImageIcon } from "lucide-react";
+import { Paperclip, FileText, Check, CheckCheck, Send, Ticket } from "lucide-react";
 
 function getDeviceIcon(deviceInfo = "") {
   if (/mobile|android|iphone/i.test(deviceInfo)) return "📱";
@@ -19,7 +19,28 @@ function getAvatarColor(name = "") {
   return colors[Math.abs(hash) % colors.length];
 }
 
-export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled }) {
+const linkify = (text = "") => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  return text.split(urlRegex).map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a 
+          key={i} 
+          href={part} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="underline decoration-indigo-400/50 hover:decoration-indigo-400 transition-all font-bold"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
+export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled, onConvertToTicket, canUseShortcuts = true }) {
   const [draft, setDraft] = useState("");
   const viewportRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -35,18 +56,18 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
   }, [messages]);
 
   useEffect(() => {
-    if (!disabled) {
+    if (!disabled && canUseShortcuts) {
       api("/api/canned-responses").then(setShortcuts).catch(() => {});
     }
-  }, [disabled]);
+  }, [disabled, canUseShortcuts]);
 
   if (!session) {
     return (
-      <section className="bg-white rounded-3xl border border-dashed border-slate-200 flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[500px] animate-in fade-in zoom-in duration-500 shadow-inner">
-        <div className="w-16 h-16 rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center text-3xl shadow-sm grayscale opacity-50">💬</div>
+      <section className="bg-white dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center p-20 text-center space-y-4 min-h-[500px] animate-in fade-in zoom-in duration-500 shadow-inner">
+        <div className="w-16 h-16 rounded-3xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center text-3xl shadow-sm grayscale opacity-50">💬</div>
         <div className="space-y-1">
-          <h3 className="heading-md text-slate-400">No Session Selected</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Select a session from the queue to start.</p>
+          <h3 className="heading-md text-slate-400 dark:text-slate-500">No Session Selected</h3>
+          <p className="text-[10px] text-slate-400 dark:text-slate-600 font-bold uppercase tracking-[0.2em]">Select a session from the queue to start.</p>
         </div>
       </section>
     );
@@ -56,6 +77,25 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     event.preventDefault();
     const value = draft.trim();
     if (!value) return;
+
+    if (canUseShortcuts && value.startsWith("/")) {
+      const shortcutValue = value.slice(1).trim().toLowerCase();
+      const exactShortcut = shortcuts.find(
+        (shortcut) => shortcut.shortcut.toLowerCase() === shortcutValue
+      );
+      const singleFilteredShortcut =
+        !exactShortcut && filteredShortcuts.length === 1 ? filteredShortcuts[0] : null;
+      const resolvedShortcut = exactShortcut || singleFilteredShortcut;
+
+      if (resolvedShortcut) {
+        onSend({ text: resolvedShortcut.content });
+        setDraft("");
+        setShowShortcuts(false);
+        setShortcutQuery("");
+        return;
+      }
+    }
+
     onSend({ text: value });
     setDraft("");
     setShowShortcuts(false);
@@ -99,16 +139,16 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     }
   }
 
-  function useShortcut(content) {
-    setDraft(content);
+  const handleShortcutClick = (content) => {
+    onSend({ text: content });
+    setDraft("");
     setShowShortcuts(false);
     setShortcutQuery("");
-    onTyping(true);
-  }
+  };
 
-  const filteredShortcuts = shortcutQuery
-    ? shortcuts.filter(s =>
-        s.shortcut.toLowerCase().includes(shortcutQuery.toLowerCase()) ||
+  const filteredShortcuts = shortcutQuery 
+    ? shortcuts.filter(s => 
+        s.shortcut.toLowerCase().includes(shortcutQuery.toLowerCase()) || 
         s.content.toLowerCase().includes(shortcutQuery.toLowerCase())
       )
     : shortcuts;
@@ -117,224 +157,243 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
   const visitorName = visitor?.name || "Anonymous";
   const avatarColor = getAvatarColor(visitorName);
 
-  return (
-    <section className="bg-white flex flex-col h-[650px] rounded-3xl border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden relative animate-in fade-in slide-in-from-bottom-2 duration-500">
+  const getRelativeStatus = () => {
+    if (visitor?.isOnline) return "Active Now";
+    if (!visitor?.lastVisitTime) return "Away";
+    const diff = Math.floor((new Date() - new Date(visitor.lastVisitTime)) / 60000);
+    if (diff < 1) return "Last active: Just now";
+    if (diff < 60) return `Last active: ${diff}m ago`;
+    return `Last active: ${Math.floor(diff/60)}h ago`;
+  };
 
-      {/* ── Header with Visitor Intelligence ── */}
-      <div className="px-8 py-5 border-b border-slate-100 shrink-0 bg-white sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-xl ${avatarColor} flex items-center justify-center text-white font-black text-sm shadow-lg select-none`}>
+  return (
+    <section className="bg-white dark:bg-slate-900/90 flex flex-col h-[700px] rounded-3xl border border-slate-100 dark:border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden relative animate-in fade-in slide-in-from-bottom-2 duration-500 transition-colors duration-500">
+
+      {/* ── Header with Premium Visitor Intel ── */}
+      <div className="px-8 py-5 border-b border-slate-50 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl shrink-0 sticky top-0 z-10 transition-colors">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 flex-1">
+            <div className={`w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center text-white font-black text-sm shadow-xl shadow-indigo-100 ring-4 ring-white dark:ring-slate-800 select-none`}>
               {getInitials(visitorName)}
             </div>
-            <div>
-              <strong className="text-xs font-black text-slate-950 tracking-tight block uppercase leading-none mb-0.5">
-                {visitorName}
-              </strong>
-              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                {session.websiteId?.websiteName || session.sessionId}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white truncate tracking-tight">{visitorName}</h3>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-100 dark:border-white/5">
+                   <span className={`w-1.5 h-1.5 rounded-full ${visitor?.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'} shrink-0`} />
+                   <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{getRelativeStatus()}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                <span>{getDeviceIcon(visitor?.deviceInfo)} {visitor?.browser || "Unknown"}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                <span className="flex items-center gap-1.5">
+                  <span className="grayscale">{visitor?.country === "IN" ? "🇮🇳" : "📍"}</span>
+                  {visitor?.city || "Unknown"}, {visitor?.country || "Earth"}
+                </span>
+                <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                <span className="flex items-center gap-1 text-indigo-500 dark:text-indigo-400 lowercase italic">
+                  Browsing: {session.currentPage ? new URL(session.currentPage).pathname : "Landing Page"}
+                </span>
+                {session.firstPage ? (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                      First page: {session.firstPage}
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
+
+          <div className="hidden lg:flex items-center gap-4 p-3 bg-slate-50/70 dark:bg-white/5 border border-slate-100/50 dark:border-white/5 rounded-2xl">
+            <div className="flex flex-col items-end">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">IP Tracking</span>
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono tracking-tighter">{visitor?.ipAddress || "0.0.0.0"}</span>
+            </div>
+            <div className="w-px h-6 bg-slate-200/50 dark:bg-white/10" />
+            <div className="flex flex-col items-end">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">System</span>
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{visitor?.os || "Unknown"}</span>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+            {onConvertToTicket ? (
+              <button
+                 onClick={() => onConvertToTicket(session)}
+                 className="p-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl flex items-center gap-2 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm group"
+                 title="Convert to Ticket"
+              >
+                 <Ticket size={18} className="group-hover:rotate-12 transition-transform" />
+                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Convert to Ticket</span>
+              </button>
+            ) : null}
+            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm border ${
               session.status === "queued"
-                ? "bg-amber-50 text-amber-600 border border-amber-100"
-                : "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20"
+                : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20"
             }`}>
               {session.status}
             </span>
-            <div className={`w-2 h-2 rounded-full ${
-              session.status === "queued"
-                ? "bg-amber-400 animate-pulse"
-                : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]"
-            }`} />
           </div>
         </div>
-
-        {/* Visitor Intel Bar */}
-        {(visitor?.city || visitor?.country || visitor?.deviceInfo || visitor?.email) && (
-          <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-slate-50">
-            {visitor?.country && (
-              <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                🌍 {visitor.city ? `${visitor.city}, ` : ""}{visitor.country}
-              </span>
-            )}
-            {visitor?.deviceInfo && (
-              <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                {getDeviceIcon(visitor.deviceInfo)}{" "}
-                {/mobile|android|iphone/i.test(visitor.deviceInfo) ? "Mobile" : /tablet|ipad/i.test(visitor.deviceInfo) ? "Tablet" : "Desktop"}
-              </span>
-            )}
-            {visitor?.email && (
-              <span className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[180px]">
-                ✉️ {visitor.email}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-slate-50/20" ref={viewportRef}>
-        {messages.map((message) => (
-          <div
-            key={message._id || `${message.createdAt}-${message.message}`}
-            className={`flex flex-col ${message.sender === "agent" ? "items-end" : "items-start"}`}
-          >
-            {message.sender !== "agent" && (
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1 px-1">
-                {message.senderName || "Visitor"}
-              </span>
-            )}
-            <div className={`max-w-[75%] px-5 py-3 rounded-2xl text-[12px] font-medium leading-relaxed shadow-sm hover:shadow-md transition-shadow ${
-              message.sender === "agent"
-                ? "bg-slate-950 text-white rounded-br-sm border border-slate-800"
-                : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-            }`}>
-              
-              {message.attachmentUrl && message.attachmentType === "image" && (
-                <img src={message.attachmentUrl} alt="Attachment" className="max-w-full rounded-xl mb-3 border border-white/20" />
-              )}
-              {message.attachmentUrl && message.attachmentType !== "image" && (
-                <a href={message.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-white/10 rounded-xl mb-3 hover:bg-white/20 transition-all font-black text-[10px] tracking-widest uppercase">
-                  <FileText size={14} />
-                  Download Attached File
-                </a>
-              )}
-              
-              {message.message}
+      {/* ── Messages Zone ── */}
+      <div 
+        ref={viewportRef}
+        className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]" 
+      >
+        {messages.map((msg, i) => {
+          const isMe = msg.sender === "agent";
+          return (
+            <div key={msg._id || i} className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
+              <div className={`max-w-[80%] group flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium shadow-sm transition-all hover:shadow-md ${
+                  isMe 
+                    ? "bg-slate-900 dark:bg-indigo-600 text-white rounded-tr-none" 
+                    : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-white/5 rounded-tl-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                }`}>
+                  {msg.attachmentUrl ? (
+                    <div className="space-y-3">
+                      {msg.attachmentType === "image" ? (
+                        <img src={msg.attachmentUrl} className="max-w-full rounded-lg shadow-sm border border-white/10" alt="Attachment" />
+                      ) : (
+                        <a href={msg.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 bg-white/5 dark:bg-black/20 rounded-xl border border-white/10">
+                          <Paperclip size={18} />
+                          <span className="text-xs font-bold underline">View Attachment</span>
+                        </a>
+                      )}
+                      {msg.message && <p className="opacity-90">{msg.message}</p>}
+                    </div>
+                  ) : (
+                    linkify(msg.message)
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[8px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest leading-none">
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {isMe && (
+                    <div className="flex items-center gap-0.5">
+                      {msg.readAt ? (
+                         <CheckCheck size={10} className="text-indigo-500" />
+                      ) : msg.deliveredAt ? (
+                         <CheckCheck size={10} className="text-slate-300 dark:text-slate-600" />
+                      ) : (
+                         <Check size={10} className="text-slate-300 dark:text-slate-600" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 mt-1 px-1">
-              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">
-                {message.createdAt
-                  ? new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                  : ""}
-              </span>
-              {message.sender === "agent" && (
-                <span className={`text-[9px] font-black ${message.readAt ? 'text-emerald-500' : 'text-slate-200'}`}>
-                  {message.readAt ? '✓✓' : '✓'}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full py-16 space-y-3 opacity-40">
-            <div className="text-3xl">💬</div>
-            <p className="small-label">No messages yet. Say hello!</p>
-          </div>
-        )}
-
+          );
+        })}
         {isTyping && (
-          <div className="flex items-center gap-2 px-1 animate-pulse">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce delay-0"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce delay-150"></span>
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce delay-300"></span>
+          <div className="flex justify-start animate-pulse">
+            <div className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-white/5 px-4 py-2 rounded-2xl rounded-tl-none">
+              <div className="flex gap-1">
+                <span className="w-1 h-1 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1 h-1 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1 h-1 bg-slate-400 dark:bg-slate-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
             </div>
-            <span className="text-[10px] font-black text-indigo-500/80 uppercase tracking-widest">Visitor is typing</span>
           </div>
         )}
       </div>
 
-      {/* ── Canned Response Shortcut Menu ── */}
-      {showShortcuts && (
-        <div className="absolute bottom-24 left-6 right-6 bg-white border border-slate-200 rounded-2xl shadow-[0_32px_64px_rgba(0,0,0,0.15)] p-4 z-20 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-50">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Canned Responses</span>
-            <span className="text-[8px] bg-slate-100 text-slate-400 px-1.5 py-0.5 rounded font-bold">Esc to close</span>
+      {/* ── Input Zone ── */}
+      {!disabled && (
+        <div className="p-6 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-white/5 relative shadow-[0_-10px_30px_rgba(0,0,0,0.02)] transition-colors">
+        {showShortcuts && (
+          <div className="absolute bottom-full left-6 right-6 mb-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500 z-50">
+            <div className="p-4 bg-slate-50/50 dark:bg-black/10 border-b border-slate-50 dark:border-white/5">
+              <input
+                autoFocus
+                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all dark:text-white"
+                placeholder="Search canned replies (use / to trigger)..."
+                value={shortcutQuery}
+                onChange={(e) => setShortcutQuery(e.target.value)}
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto p-2">
+              {filteredShortcuts.map((s) => (
+                <button
+                  key={s._id}
+                  onClick={() => handleShortcutClick(s.content)}
+                  className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl group transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 uppercase tracking-widest leading-none">/{s.shortcut}</span>
+                    <span className="text-[10px] font-black text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-widest leading-none">Shortcut</span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{s.content}</p>
+                </button>
+              ))}
+            </div>
           </div>
-          <input
-            autoFocus
-            value={shortcutQuery}
-            onChange={e => setShortcutQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === "Escape") { setShowShortcuts(false); setShortcutQuery(""); } }}
-            placeholder="Search shortcuts…"
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-[11px] font-bold mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-300 transition-all"
-          />
-          <div className="max-h-48 overflow-y-auto space-y-1.5 custom-scrollbar">
-            {filteredShortcuts.length > 0 ? filteredShortcuts.map(s => (
-              <button
-                key={s._id}
-                type="button"
-                onClick={() => useShortcut(s.content)}
-                className="w-full text-left px-4 py-3 hover:bg-slate-50 rounded-xl transition-all group flex items-start gap-4 border border-transparent hover:border-slate-100"
-              >
-                <span className="text-[10px] font-black text-white bg-slate-950 px-2 py-1 rounded-lg shrink-0 group-hover:bg-indigo-600 transition-colors uppercase tracking-widest">
-                  /{s.shortcut}
-                </span>
-                <span className="text-xs text-slate-600 truncate font-medium">{s.content}</span>
-              </button>
-            )) : (
-              <p className="text-[10px] text-slate-400 text-center py-4 font-bold uppercase tracking-widest">No matches found</p>
-            )}
+        )}
+
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <div className="relative group">
+            <textarea
+              className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-50 dark:border-white/5 rounded-3xl px-6 py-4 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500/50 outline-none transition-all resize-none shadow-inner min-h-[80px] dark:text-white"
+                placeholder={
+                  disabled
+                    ? "Session is read-only..."
+                    : canUseShortcuts
+                      ? "Type your message or '/' for shortcuts..."
+                      : "Type your message..."
+                }
+                disabled={disabled || isUploading}
+                value={draft}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDraft(val);
+                  onTyping(val.length > 0);
+                  if (canUseShortcuts && val.startsWith("/") && !showShortcuts) {
+                    setShowShortcuts(true);
+                    setShortcutQuery(val.substring(1));
+                  } else if (!canUseShortcuts || !val.startsWith("/")) {
+                    setShowShortcuts(false);
+                  } else if (showShortcuts) {
+                    setShortcutQuery(val.substring(1));
+                  }
+                }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit(e);
+                }
+              }}
+            />
+            
+            <div className="absolute right-4 bottom-4 flex items-center gap-2">
+               <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/10 rounded-2xl transition-all"
+                  title="Attach file"
+                >
+                  <Paperclip size={18} />
+                </button>
+                <button
+                  type="submit"
+                  disabled={disabled || (!draft.trim() && !isUploading)}
+                  className="bg-slate-950 dark:bg-indigo-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center hover:bg-slate-800 dark:hover:bg-indigo-500 disabled:opacity-30 disabled:grayscale transition-all shadow-xl shadow-slate-200 dark:shadow-none"
+                >
+                  <Send size={18} />
+                </button>
+            </div>
           </div>
+          
+          <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+        </form>
         </div>
       )}
-
-      {/* ── Input Form ── */}
-      <form
-        className="p-6 bg-white border-t border-slate-100 flex gap-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.02)]"
-        onSubmit={submit}
-      >
-        <div className="relative flex-1 flex gap-3">
-          <button
-            type="button"
-            onClick={() => { setShowShortcuts(!showShortcuts); setShortcutQuery(""); }}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0 ${
-              showShortcuts
-                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
-                : "bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100 hover:text-slate-600"
-            }`}
-            title="Canned Responses"
-          >
-            <span className="text-lg font-black italic">/</span>
-          </button>
-          
-          <button
-            type="button"
-            className="w-12 h-12 rounded-xl flex items-center justify-center bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100 hover:text-slate-600 transition-all shrink-0 cursor-pointer relative"
-            title="Attach file"
-            disabled={disabled || isUploading}
-          >
-            {isUploading ? <span className="animate-spin text-lg">⏳</span> : <Paperclip size={18} />}
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              onChange={handleFileUpload} 
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              disabled={disabled || isUploading}
-              accept="image/*,application/pdf"
-            />
-          </button>
-
-          <input
-            value={draft}
-            onChange={(event) => {
-              const val = event.target.value;
-              setDraft(val);
-              onTyping(val.trim().length > 0);
-              if (val.startsWith("/")) setShowShortcuts(true);
-              else if (!val.startsWith("/")) setShowShortcuts(false);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") { setShowShortcuts(false); setShortcutQuery(""); }
-            }}
-            className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all placeholder:text-slate-300"
-            placeholder={disabled ? "Access restricted…" : "Compose response… (/ for shortcuts)"}
-            disabled={disabled || isUploading}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={disabled || !draft.trim() || isUploading}
-          className="bg-slate-950 hover:bg-black disabled:bg-slate-100 disabled:text-slate-300 text-white px-8 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-slate-200 disabled:shadow-none active:scale-95"
-        >
-          Send
-        </button>
-      </form>
     </section>
   );
 }

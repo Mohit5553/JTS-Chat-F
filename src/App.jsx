@@ -5,8 +5,12 @@ import ClientPage from "./pages/ClientPage.jsx";
 import AgentPage from "./pages/AgentPage.jsx";
 import TicketStatusPage from "./pages/TicketStatusPage.jsx";
 
+import ManagerPage from "./pages/ManagerPage.jsx";
+
 function destinationForRole(role) {
-  if (role === "agent") return "/agent";
+  if (["agent", "user"].includes(role)) return "/agent";
+  if (role === "sales") return "/sales";
+  if (role === "manager") return "/manager";
   if (role === "admin") return "/admin";
   return "/client";
 }
@@ -29,6 +33,9 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children;
 }
 
+// Ensure the new SalesPage is imported (I will create it next)
+import SalesPage from "./pages/SalesPage.jsx";
+
 export default function App() {
   const { user } = useAuth();
 
@@ -37,8 +44,10 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/ticket-status/:ticketId" element={<TicketStatusPage />} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><ClientPage /></ProtectedRoute>} />
+      <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerPage /></ProtectedRoute>} />
       <Route path="/client" element={<ProtectedRoute allowedRoles={["client"]}><ClientPage /></ProtectedRoute>} />
-      <Route path="/agent" element={<ProtectedRoute allowedRoles={["agent"]}><AgentPage /></ProtectedRoute>} />
+      <Route path="/sales" element={<ProtectedRoute allowedRoles={["sales"]}><SalesPage /></ProtectedRoute>} />
+      <Route path="/agent" element={<ProtectedRoute allowedRoles={["agent", "user"]}><AgentPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to={user ? destinationForRole(user.role) : "/login"} replace />} />
     </Routes>
   );

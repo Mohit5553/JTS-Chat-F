@@ -11,22 +11,22 @@ export default function StatCard({ label, value, trend, color = "indigo" }) {
   const selectedColor = colors[color] || colors.indigo;
 
   return (
-    <article className="premium-card p-10 group hover:-translate-y-1 transition-all duration-500 bg-white border border-slate-200/60 shadow-sm rounded-[40px] overflow-hidden flex flex-col justify-between">
+    <article className="premium-card p-10 group hover:-translate-y-1 transition-all duration-500 bg-white dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/5 shadow-sm rounded-[40px] overflow-hidden flex flex-col justify-between">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
-           <span className="text-[10px] whitespace-nowrap font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-600 transition-colors">{label}</span>
+           <span className="text-[10px] whitespace-nowrap font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">{label}</span>
            {trend && (
-             <div className={`px-2 py-1 rounded-lg bg-slate-50 text-[9px] font-black uppercase tracking-tighter flex items-center gap-1 group-hover:bg-white transition-colors`}>
+             <div className="px-2 py-1 rounded-lg bg-slate-50 dark:bg-white/5 text-[9px] font-black uppercase tracking-tighter flex items-center gap-1 group-hover:bg-white dark:group-hover:bg-white/10 transition-colors">
                <ArrowUpRight size={10} className={selectedColor.split(' ').pop()} />
-               <span className="text-slate-400">{trend}</span>
+               <span className="text-slate-400 dark:text-slate-500">{trend}</span>
              </div>
            )}
         </div>
         <div className="flex items-baseline gap-2">
-           <strong className="text-4xl font-black text-slate-900 tracking-tighter">{value}</strong>
+           <strong className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</strong>
         </div>
       </div>
-      <div className={`h-1.5 w-12 bg-slate-100 rounded-full mt-10 group-hover:w-20 bg-gradient-to-r ${selectedColor.split(' ').slice(0, 2).join(' ')} transition-all duration-700 shadow-md`}></div>
+      <div className={`h-1.5 w-12 bg-slate-100 dark:bg-white/5 rounded-full mt-10 group-hover:w-20 bg-gradient-to-r ${selectedColor.split(' ').slice(0, 2).join(' ')} transition-all duration-700 shadow-md`}></div>
     </article>
   );
 }

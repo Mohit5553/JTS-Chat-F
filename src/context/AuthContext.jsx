@@ -23,11 +23,15 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(email, password) {
+  async function login(email, password, twoFactorCode = "") {
     const data = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, twoFactorCode })
     });
+
+    if (data.twoFactorRequired) {
+      return data;
+    }
 
     localStorage.setItem("dashboard_token", data.token);
     setUser(data.user);

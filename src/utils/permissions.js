@@ -1,0 +1,35 @@
+import { PERMISSIONS, ROLES } from "../constants/domain.js";
+
+const MATRIX = {
+  [ROLES.ADMIN]: new Set(Object.values(PERMISSIONS)),
+  [ROLES.CLIENT]: new Set(Object.values(PERMISSIONS)),
+  [ROLES.MANAGER]: new Set([
+    PERMISSIONS.CRM_VIEW,
+    PERMISSIONS.CRM_CREATE,
+    PERMISSIONS.CRM_UPDATE,
+    PERMISSIONS.CRM_ARCHIVE,
+    PERMISSIONS.CRM_ASSIGN_OWNER,
+    PERMISSIONS.CRM_MERGE,
+    PERMISSIONS.CRM_MANAGE_TASKS,
+    PERMISSIONS.ACTIVITY_VIEW
+  ]),
+  [ROLES.SALES]: new Set([
+    PERMISSIONS.CRM_VIEW,
+    PERMISSIONS.CRM_CREATE,
+    PERMISSIONS.CRM_UPDATE,
+    PERMISSIONS.CRM_ARCHIVE,
+    PERMISSIONS.CRM_SEND_EMAIL,
+    PERMISSIONS.CRM_MANAGE_TASKS,
+    PERMISSIONS.ACTIVITY_VIEW
+  ]),
+  [ROLES.AGENT]: new Set([
+    PERMISSIONS.CRM_VIEW,
+    PERMISSIONS.ACTIVITY_VIEW
+  ]),
+  [ROLES.USER]: new Set([])
+};
+
+export function hasPermission(user, permission) {
+  if (!user?.role) return false;
+  return MATRIX[user.role]?.has(permission) || false;
+}

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { Globe, Plus, Trash2, Copy, Check, Settings, Code } from "lucide-react";
+import { Globe, Plus, Trash2, Copy, Check, Settings, Code, Palette, X } from "lucide-react";
 import { api, API_BASE } from "../api/client.js";
+import WidgetCustomizer from "./WidgetCustomizer.jsx";
+import PaginationControls from "./PaginationControls.jsx";
+import { getPaginationMeta } from "../utils/pagination.js";
 
 const COLOR_PRESETS = [
   { primary: "#6366f1", accent: "#4f46e5", name: "Indigo" },
@@ -12,6 +15,18 @@ const COLOR_PRESETS = [
   { primary: "#ec4899", accent: "#db2777", name: "Pink" },
   { primary: "#0f172a", accent: "#020617", name: "Slate" }
 ];
+
+const DEFAULT_BUSINESS_HOURS = {
+  enabled: false,
+  timezone: "Asia/Kolkata",
+  monday: { isOpen: true, open: "09:00", close: "17:00" },
+  tuesday: { isOpen: true, open: "09:00", close: "17:00" },
+  wednesday: { isOpen: true, open: "09:00", close: "17:00" },
+  thursday: { isOpen: true, open: "09:00", close: "17:00" },
+  friday: { isOpen: true, open: "09:00", close: "17:00" },
+  saturday: { isOpen: false, open: "09:00", close: "17:00" },
+  sunday: { isOpen: false, open: "09:00", close: "17:00" }
+};
 
 export default function WebsiteManager() {
   const [websites, setWebsites] = useState([]);
@@ -26,9 +41,15 @@ export default function WebsiteManager() {
     primaryColor: "#6366f1",
     accentColor: "#f59e0b",
     launcherIcon: "💬",
+    welcomeMessage: "Hi there! How can we help you today?",
     awayMessage: "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
-    isActive: true
+    quickReplies: [],
+    isActive: true,
+    businessHours: DEFAULT_BUSINESS_HOURS,
+    webhooks: []
   });
+  const [customizingWebsite, setCustomizingWebsite] = useState(null);
+  const [page, setPage] = useState(1);
 
   const fetchWebsites = async () => {
     try {
@@ -45,6 +66,10 @@ export default function WebsiteManager() {
     fetchWebsites();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [websites.length]);
+
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -60,8 +85,12 @@ export default function WebsiteManager() {
       primaryColor: "#6366f1",
       accentColor: "#f59e0b",
       launcherIcon: "💬",
+      welcomeMessage: "Hi there! How can we help you today?",
       awayMessage: "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
-      isActive: true
+      quickReplies: [],
+      isActive: true,
+      businessHours: DEFAULT_BUSINESS_HOURS,
+      webhooks: []
     });
   };
 
@@ -73,8 +102,12 @@ export default function WebsiteManager() {
       primaryColor: website.primaryColor || "#6366f1",
       accentColor: website.accentColor || "#f59e0b",
       launcherIcon: website.launcherIcon || "💬",
+      welcomeMessage: website.welcomeMessage || "Hi there! How can we help you today?",
       awayMessage: website.awayMessage || "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
-      isActive: website.isActive !== false
+      quickReplies: website.quickReplies || [],
+      isActive: website.isActive !== false,
+      businessHours: website.businessHours || DEFAULT_BUSINESS_HOURS,
+      webhooks: website.webhooks || []
     });
     setIsAdding(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -102,301 +135,530 @@ export default function WebsiteManager() {
   };
 
   if (loading) return (
-     <div className="space-y-10 animate-pulse">
-        <div className="flex items-center justify-between">
-           <div className="space-y-3">
-              <div className="h-8 w-64 bg-slate-200 rounded-xl"></div>
-              <div className="h-4 w-96 bg-slate-100 rounded-lg"></div>
-           </div>
-           <div className="h-12 w-48 bg-indigo-50 rounded-2xl"></div>
-        </div>
-        <div className="grid grid-cols-1 gap-6">
-           {[1, 2, 3].map(i => (
-              <div key={i} className="h-48 w-full bg-slate-50 rounded-[32px] border border-slate-100"></div>
-           ))}
-        </div>
-     </div>
+    <div className="flex flex-col items-center justify-center py-32 space-y-6">
+      <div className="w-12 h-12 border-4 border-indigo-100 dark:border-white/5 border-t-indigo-600 rounded-full animate-spin" />
+      <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.3em] animate-pulse">Synchronizing Multi-Domain Network...</p>
+    </div>
   );
 
   const PreviewWidget = ({ data }) => (
-    <div className="hidden lg:flex flex-col h-full w-full bg-slate-100 border border-slate-200/60 rounded-3xl relative overflow-hidden pt-6 px-6 drop-shadow-sm">
-      <div className="space-y-2 mb-4">
-        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] text-center">Live Preview</h4>
+    <div className="hidden lg:flex flex-col h-full w-full bg-slate-50 dark:bg-black/20 border border-slate-200/60 dark:border-white/5 rounded-[40px] relative overflow-hidden pt-8 px-8 transition-colors">
+      <div className="space-y-2 mb-6">
+        <h4 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.3em] text-center">Real-Time Synthesis</h4>
       </div>
-      <div className="flex-1 w-full bg-white rounded-t-2xl shadow-sm border border-slate-200 relative overflow-hidden flex flex-col">
-         {/* Browser Chrome */}
-         <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2 shrink-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-inner"></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-inner"></div>
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-inner"></div>
-            <div className="ml-4 bg-white px-4 py-1.5 rounded-md text-[8px] font-bold text-slate-400 border border-slate-200 w-1/2 flex items-center gap-2">
-               <Globe size={10} className="text-slate-300"/> {data.domain || 'yourdomain.com'}
-            </div>
-         </div>
-         {/* Page Content Ghost */}
-         <div className="p-8 space-y-4 opacity-50 flex-1">
-            <div className="h-4 w-1/3 bg-slate-200 rounded-md"></div>
-            <div className="h-2 w-full bg-slate-100 rounded-md"></div>
-            <div className="h-2 w-5/6 bg-slate-100 rounded-md"></div>
-            <div className="h-2 w-4/6 bg-slate-100 rounded-md"></div>
-         </div>
-         
-         {/* Live Chat Widget */}
-         <div className="absolute bottom-4 right-4 flex flex-col items-end gap-3 z-10 w-[240px] pointer-events-none transition-all duration-300" style={{ filter: data.isActive ? 'none' : 'grayscale(1) opacity(0.6)' }}>
-            <div className="w-full bg-white shadow-2xl rounded-2xl overflow-hidden border border-slate-100 flex flex-col transform transition-all hover:-translate-y-1 origin-bottom-right">
-               {/* Widget Header */}
-               <div className="p-4 transition-colors" style={{ backgroundColor: data.primaryColor }}>
-                  <h5 className="text-white text-[12px] font-bold drop-shadow-sm">{data.websiteName || 'Your Awesome Brand'}</h5>
-                  <p className="text-white/80 text-[9px] mt-0.5 font-medium">We typically reply in minutes</p>
-               </div>
-               {/* Widget Messages */}
-               <div className="p-3 bg-[#f8fafc] space-y-3 min-h-[140px] border-b border-indigo-50/50">
-                  <div className="flex items-start gap-2 animate-in slide-in-from-bottom-2 fade-in duration-500">
-                     <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white shadow-md transition-colors shrink-0" style={{ backgroundColor: data.primaryColor }}>
-                        {data.launcherIcon}
-                     </div>
-                     <div className="bg-white border border-slate-200 p-2.5 rounded-xl rounded-tl-sm text-[10px] text-slate-600 shadow-sm leading-relaxed shrink min-w-[50px]">
-                        {data.awayMessage || 'Hello! How can we help?'}
-                     </div>
-                  </div>
-               </div>
-               {/* Widget Input Mock */}
-               <div className="p-3 bg-white flex gap-2 items-center">
-                  <div className="flex-1 bg-slate-50 rounded-lg p-2 text-[9px] text-slate-400 border border-slate-100">Type a message...</div>
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-sm transition-colors" style={{ backgroundColor: data.primaryColor }}>
-                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                  </div>
-               </div>
-            </div>
+      <div className="flex-1 w-full bg-white dark:bg-slate-900 rounded-t-[32px] shadow-2xl border-t border-x border-slate-200 dark:border-white/5 relative overflow-hidden flex flex-col transition-colors">
+        {/* Browser Chrome */}
+        <div className="p-4 bg-slate-50/50 dark:bg-white/5 border-b border-slate-100 dark:border-white/5 flex items-center gap-2 shrink-0">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-400/50 shadow-inner"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400/50 shadow-inner"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/50 shadow-inner"></div>
+          <div className="ml-4 bg-white dark:bg-black/30 px-4 py-2 rounded-xl text-[9px] font-black text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-white/5 w-1/2 flex items-center gap-2 tracking-tight">
+            <Globe size={11} className="text-slate-300 dark:text-slate-700" /> {data.domain || 'yourdomain.com'}
+          </div>
+        </div>
+        {/* Page Content Ghost */}
+        <div className="p-10 space-y-5 opacity-20 flex-1">
+          <div className="h-6 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+          <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-lg"></div>
+          <div className="h-3 w-5/6 bg-slate-100 dark:bg-slate-800 rounded-lg"></div>
+          <div className="h-3 w-4/6 bg-slate-100 dark:bg-slate-800 rounded-lg"></div>
+        </div>
 
-            {/* Launcher Button */}
-            <div className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-xl text-white transition-all hover:scale-110 hover:shadow-xl" style={{ backgroundColor: data.primaryColor }}>
-               <span className="drop-shadow-sm">{data.launcherIcon}</span>
+        {/* Live Chat Widget */}
+        <div className="absolute bottom-6 right-6 flex flex-col items-end gap-5 z-10 w-[280px] pointer-events-none transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]" style={{ filter: data.isActive ? 'none' : 'grayscale(1) opacity(0.6)' }}>
+          <div className="w-full bg-white dark:bg-slate-950 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] rounded-[32px] overflow-hidden border border-slate-100 dark:border-white/5 flex flex-col transform transition-all hover:-translate-y-2 origin-bottom-right">
+            {/* Widget Header */}
+            <div className="p-6 transition-colors relative h-20 flex flex-col justify-center" style={{ backgroundColor: data.primaryColor }}>
+              <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
+              <h5 className="text-white text-[13px] font-black drop-shadow-md uppercase tracking-tight">{data.websiteName || 'New Brand'}</h5>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <p className="text-white/80 text-[10px] font-bold">Agents Active</p>
+              </div>
             </div>
-         </div>
+            {/* Widget Messages */}
+            <div className="p-5 bg-[#f8fafc] dark:bg-black/30 space-y-4 min-h-[160px] border-b border-indigo-50/10 transition-colors">
+              <div className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] text-white shadow-xl transition-all shrink-0 border border-white/10" style={{ backgroundColor: data.primaryColor }}>
+                  {data.launcherIcon}
+                </div>
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 p-3.5 rounded-2xl rounded-tl-sm text-[11px] text-slate-700 dark:text-slate-200 shadow-sm leading-relaxed font-bold">
+                  {data.awayMessage || 'Initiating support protocol...'}
+                </div>
+              </div>
+            </div>
+            {/* Widget Input Mock */}
+            <div className="p-5 bg-white dark:bg-slate-950 flex gap-3 items-center transition-colors">
+              <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-xl p-3 text-[10px] text-slate-400 dark:text-slate-600 border border-slate-100 dark:border-white/5 font-bold">Type a message...</div>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xl transition-all" style={{ backgroundColor: data.primaryColor }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Launcher Button */}
+          <div className="w-14 h-14 rounded-[22px] shadow-2xl flex items-center justify-center text-2xl text-white transition-all hover:scale-110 hover:shadow-indigo-500/20 duration-500 border-2 border-white dark:border-slate-800" style={{ backgroundColor: data.primaryColor }}>
+            <span className="drop-shadow-lg">{data.launcherIcon}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
 
+  if (customizingWebsite) {
+    return (
+      <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1.5">
+            <h3 className="heading-md dark:text-white">Design Synthesis: {customizingWebsite.websiteName}</h3>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Live branding engine for distributed widget deployment.</p>
+          </div>
+          <button
+            onClick={() => setCustomizingWebsite(null)}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-400 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-950 hover:text-white transition-all shadow-sm"
+          >
+            Return to Fleet
+          </button>
+        </div>
+        <WidgetCustomizer
+          website={customizingWebsite}
+          onUpdate={(updated) => {
+            setCustomizingWebsite(updated);
+            fetchWebsites();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center justify-between">
-         <div className="space-y-1">
-            <h3 className="heading-md">Website Ecosystem</h3>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Securely manage registered domains and widget credentials.</p>
-         </div>
-         <button 
-           onClick={() => isAdding ? handleCancel() : setIsAdding(true)}
-           className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-100 flex items-center gap-3"
-         >
-           <Plus size={16} />
-           {isAdding ? "Cancel" : "Register Website"}
-         </button>
+    <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="space-y-1.5">
+          <h3 className="heading-md dark:text-white">Multi-Domain Ecosystem</h3>
+          <p className="small-label dark:text-slate-500">Securely monitor registered domains and manage cryptographic widget credentials.</p>
+        </div>
+        <button
+          onClick={() => isAdding ? handleCancel() : setIsAdding(true)}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-[24px] font-black text-[11px] uppercase tracking-[0.3em] transition-all shadow-2xl shadow-indigo-500/20 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          {isAdding ? <X size={18} /> : <Plus size={18} />}
+          {isAdding ? "Cancel Operation" : "Deploy New Terminal"}
+        </button>
       </div>
 
       {isAdding && (
-         <form onSubmit={handleSubmit} className="premium-card p-10 animate-in zoom-in-95 duration-500 overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-14">
-               {/* Left Segment: Form Inputs */}
-               <div className="lg:col-span-2 space-y-8">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                     <div className="space-y-5">
-                        <div className="space-y-1.5 pt-1">
-                           <label className="small-label flex justify-between">
-                              Website Name <span className="text-[9px] text-indigo-400 font-bold uppercase">Required</span>
-                           </label>
-                           <input
-                             value={formData.websiteName}
-                             onChange={(e) => setFormData({ ...formData, websiteName: e.target.value })}
-                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder-slate-300"
-                             placeholder="My Store"
-                             required
-                           />
-                        </div>
-                        <div className="space-y-1.5 pt-1">
-                           <label className="small-label">Root Domain</label>
-                           <input
-                             value={formData.domain}
-                             onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
-                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder-slate-300"
-                             placeholder="mystore.com"
-                             required
-                           />
-                        </div>
-                        <div className="space-y-1.5 pt-1">
-                           <label className="small-label">Auto-Responder / Away Message</label>
-                           <textarea
-                             value={formData.awayMessage}
-                             onChange={(e) => setFormData({ ...formData, awayMessage: e.target.value })}
-                             className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all h-28 resize-none text-slate-600"
-                             required
-                           />
-                        </div>
-                     </div>
-                     <div className="space-y-5">
-                        <div className="space-y-3 pt-1">
-                           <label className="small-label">Brand Color Pattern</label>
-                           <div className="flex flex-wrap gap-2.5">
-                              {COLOR_PRESETS.map((preset) => (
-                                 <button
-                                    key={preset.name}
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, primaryColor: preset.primary, accentColor: preset.accent })}
-                                    className={`w-[42px] h-[42px] rounded-2xl border-[3px] transition-all hover:scale-110 ${formData.primaryColor === preset.primary ? 'border-slate-900 scale-110 shadow-lg' : 'border-transparent shadow-sm'}`}
-                                    style={{ backgroundColor: preset.primary }}
-                                    title={preset.name}
-                                 />
-                              ))}
-                           </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                           <div className="space-y-1.5 pt-1">
-                              <label className="small-label">Launcher Icon</label>
-                              <input
-                                 value={formData.launcherIcon}
-                                 onChange={(e) => setFormData({ ...formData, launcherIcon: e.target.value })}
-                                 className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-black focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-center"
-                                 placeholder="💬"
-                                 maxLength={4}
-                              />
-                           </div>
-                           <div className="space-y-1.5 pt-1">
-                              <label className="small-label">System Status</label>
-                              <button
-                                 type="button"
-                                 onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                                 className={`w-full py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm ${
-                                    formData.isActive 
-                                       ? "bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100"
-                                       : "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
-                                 }`}
-                              >
-                                 {formData.isActive ? "🟢 Active Engine" : "🔴 Offline"}
-                              </button>
-                           </div>
-                        </div>
-                     </div>
+        <form onSubmit={handleSubmit} className="premium-card p-10 md:p-16 animate-in zoom-in-95 duration-700 overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 transition-colors">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
+            {/* Left Segment: Form Inputs */}
+            <div className="lg:col-span-7 space-y-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="small-label dark:text-slate-400">Terminal Identity (Name)</label>
+                    <input
+                      value={formData.websiteName}
+                      onChange={(e) => setFormData({ ...formData, websiteName: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4.5 text-xs font-black focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-800 dark:text-white shadow-inner"
+                      placeholder="Platform Alpha"
+                      required
+                    />
                   </div>
-                  
-                  <div className="pt-2 border-t border-slate-100">
-                     <button type="submit" className="w-full hover:scale-[1.01] active:scale-[0.99] bg-slate-900 hover:bg-black text-white font-black text-[11px] uppercase tracking-[0.2em] py-5 rounded-2xl shadow-xl shadow-slate-200 transition-all mt-4 flex items-center justify-center gap-3">
-                        <Check size={16} /> 
-                        {editingId ? "Update Ecosystem Details" : "Launch Registration Sequence"}
-                     </button>
+                  <div className="space-y-3">
+                    <label className="small-label dark:text-slate-400">Domain Authority (URL)</label>
+                    <input
+                      value={formData.domain}
+                      onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4.5 text-xs font-black focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-800 dark:text-white shadow-inner"
+                      placeholder="alpha.enterprise.com"
+                      required
+                    />
                   </div>
-               </div>
-               
-               {/* Right Segment: Live Preview */}
-               <PreviewWidget data={formData} />
+                </div>
+                <div className="space-y-8">
+                  <div className="space-y-3">
+                    <label className="small-label dark:text-slate-400">Auto-Responder Signal</label>
+                    <textarea
+                      value={formData.awayMessage}
+                      onChange={(e) => setFormData({ ...formData, awayMessage: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4.5 text-xs font-bold focus:border-indigo-500/50 outline-none transition-all h-[155px] resize-none text-slate-600 dark:text-slate-300 shadow-inner leading-relaxed"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Replies Section */}
+              <div className="pt-10 border-t border-slate-50 dark:border-white/5 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <label className="small-label dark:text-slate-400">Quick Replies & Auto-Responders</label>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Predefined pills that visitors can click to send/get info.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, quickReplies: [...formData.quickReplies, { text: "", autoResponse: "" }] })}
+                    className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                  >
+                    Add Pillar
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {formData.quickReplies.map((qr, idx) => (
+                    <div key={idx} className="flex items-start gap-4 p-6 bg-slate-50 dark:bg-black/20 rounded-[28px] border border-slate-100 dark:border-white/5 group relative animate-in slide-in-from-right-2 duration-300">
+                      <div className="flex-1 space-y-4">
+                        <div className="space-y-2">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Button Text (Visitor Sees)</span>
+                          <input
+                            value={qr.text}
+                            onChange={(e) => {
+                              const newQR = [...formData.quickReplies];
+                              newQR[idx].text = e.target.value;
+                              setFormData({ ...formData, quickReplies: newQR });
+                            }}
+                            placeholder="e.g. Pricing Details?"
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-[11px] font-black outline-none focus:border-indigo-500 transition-all shadow-sm"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Auto-Response (System Replies) — Optional</span>
+                          <textarea
+                            value={qr.autoResponse}
+                            onChange={(e) => {
+                              const newQR = [...formData.quickReplies];
+                              newQR[idx].autoResponse = e.target.value;
+                              setFormData({ ...formData, quickReplies: newQR });
+                            }}
+                            placeholder="e.g. Our basic plan starts at $29/mo..."
+                            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:border-indigo-500 transition-all shadow-sm h-20 resize-none leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newQR = formData.quickReplies.filter((_, i) => i !== idx);
+                          setFormData({ ...formData, quickReplies: newQR });
+                        }}
+                        className="mt-6 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  {formData.quickReplies.length === 0 && (
+                    <div className="py-10 text-center border-2 border-dashed border-slate-100 dark:border-white/5 rounded-[32px]">
+                      <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">No interactive pillars defined.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-4">
+                  <label className="small-label dark:text-slate-400">Primary Color Vector</label>
+                  <div className="flex flex-wrap gap-3">
+                    {COLOR_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, primaryColor: preset.primary, accentColor: preset.accent })}
+                        className={`w-11 h-11 rounded-2xl border-[4px] transition-all hover:scale-110 active:scale-90 ${formData.primaryColor === preset.primary ? 'border-slate-900 dark:border-white scale-110 shadow-2xl' : 'border-transparent dark:border-white/5 shadow-sm'}`}
+                        style={{ backgroundColor: preset.primary }}
+                        title={preset.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="small-label dark:text-slate-400">Launcher Icon</label>
+                    <input
+                      value={formData.launcherIcon}
+                      onChange={(e) => setFormData({ ...formData, launcherIcon: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4.5 text-xl font-black focus:border-indigo-500/50 outline-none transition-all text-center shadow-inner"
+                      placeholder="💬"
+                      maxLength={4}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="small-label dark:text-slate-400">System State</label>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
+                      className={`w-full py-4.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl ${formData.isActive
+                        ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                        : "bg-red-500 text-white shadow-red-500/20"
+                        }`}
+                    >
+                      {formData.isActive ? "Online" : "Paused"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-10 border-t border-slate-50 dark:border-white/5 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="small-label dark:text-slate-400">Business Hours</label>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Offline form appears automatically when closed.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({
+                      ...formData,
+                      businessHours: { ...formData.businessHours, enabled: !formData.businessHours?.enabled }
+                    })}
+                    className={`rounded-2xl px-5 py-3 text-[10px] font-black uppercase tracking-widest ${formData.businessHours?.enabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"}`}
+                  >
+                    {formData.businessHours?.enabled ? "Enabled" : "Disabled"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <input
+                    value={formData.businessHours?.timezone || "Asia/Kolkata"}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      businessHours: { ...formData.businessHours, timezone: e.target.value }
+                    })}
+                    className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-6 py-4 text-xs font-black"
+                    placeholder="Timezone, e.g. Asia/Kolkata"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="time"
+                      value={formData.businessHours?.monday?.open || "09:00"}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        businessHours: {
+                          ...formData.businessHours,
+                          monday: { ...(formData.businessHours?.monday || {}), open: e.target.value, isOpen: true }
+                        }
+                      })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-4 py-4 text-xs font-black"
+                    />
+                    <input
+                      type="time"
+                      value={formData.businessHours?.monday?.close || "17:00"}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        businessHours: {
+                          ...formData.businessHours,
+                          monday: { ...(formData.businessHours?.monday || {}), close: e.target.value, isOpen: true }
+                        }
+                      })}
+                      className="w-full bg-slate-50 dark:bg-black/20 border-2 border-slate-100 dark:border-white/5 rounded-2xl px-4 py-4 text-xs font-black"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-10 border-t border-slate-50 dark:border-white/5 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="small-label dark:text-slate-400">Webhooks</label>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Receive `ticket.created`, `ticket.updated`, `chat.closed`, and `chat.assigned` events.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, webhooks: [...(formData.webhooks || []), { url: "", secret: "", events: ["ticket.created"] }] })}
+                    className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest"
+                  >
+                    Add Webhook
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {(formData.webhooks || []).map((hook, idx) => (
+                    <div key={idx} className="rounded-[28px] border border-slate-100 p-5 dark:border-white/5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input
+                          value={hook.url}
+                          onChange={(e) => {
+                            const webhooks = [...formData.webhooks];
+                            webhooks[idx] = { ...webhooks[idx], url: e.target.value };
+                            setFormData({ ...formData, webhooks });
+                          }}
+                          placeholder="https://example.com/webhooks/support"
+                          className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl px-4 py-3 text-xs font-bold"
+                        />
+                        <input
+                          value={hook.secret || ""}
+                          onChange={(e) => {
+                            const webhooks = [...formData.webhooks];
+                            webhooks[idx] = { ...webhooks[idx], secret: e.target.value };
+                            setFormData({ ...formData, webhooks });
+                          }}
+                          placeholder="Signing secret"
+                          className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl px-4 py-3 text-xs font-bold"
+                        />
+                      </div>
+                      <input
+                        value={(hook.events || []).join(", ")}
+                        onChange={(e) => {
+                          const webhooks = [...formData.webhooks];
+                          webhooks[idx] = { ...webhooks[idx], events: e.target.value.split(",").map(v => v.trim()).filter(Boolean) };
+                          setFormData({ ...formData, webhooks });
+                        }}
+                        placeholder="ticket.created, ticket.updated"
+                        className="mt-4 w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl px-4 py-3 text-xs font-bold"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-10 border-t border-slate-50 dark:border-white/5">
+                <button type="submit" className="w-full bg-slate-950 dark:bg-indigo-600 hover:bg-black dark:hover:bg-indigo-500 text-white font-black text-[11px] uppercase tracking-[0.4em] py-6 rounded-[24px] shadow-2xl transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-4">
+                  <Check size={20} />
+                  {editingId ? "Update Configuration" : "Finalize Ecosystem Deployment"}
+                </button>
+              </div>
             </div>
-         </form>
+
+            {/* Right Segment: Live Preview */}
+            <div className="lg:col-span-5 h-[640px]">
+              <PreviewWidget data={formData} />
+            </div>
+          </div>
+        </form>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl text-[11px] font-bold">
-          Error: {error}
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 text-red-600 dark:text-red-400 px-8 py-5 rounded-[24px] text-[11px] font-black uppercase tracking-widest shadow-xl animate-in shake duration-500">
+          Neural Interface Error: {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-8">
-        {websites.map((website) => (
-          <div key={website._id} className={`premium-card p-0 overflow-hidden group hover:shadow-[0_20px_40px_-15px_rgba(99,102,241,0.1)] transition-all duration-500 border-2 ${website.isActive !== false ? 'border-transparent hover:border-indigo-50/50' : 'border-slate-100 opacity-80 grayscale hover:grayscale-0'}`}>
-             <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6 relative">
-                {website.isActive === false && <div className="absolute inset-0 bg-slate-50/50 z-0"></div>}
-                
-                <div className="flex items-center gap-6 relative z-10">
-                   <div 
-                     className="w-[72px] h-[72px] rounded-[24px] flex items-center justify-center text-3xl shadow-inner shrink-0"
-                     style={{ backgroundColor: website.primaryColor + '15', color: website.primaryColor }}
-                   >
-                      <Globe size={32} />
-                   </div>
-                   <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                         <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">{website.websiteName}</h4>
-                         <span className={`px-2.5 py-1 text-[8px] font-black uppercase tracking-widest rounded-md shadow-sm ${website.isActive !== false ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                            {website.isActive !== false ? 'Live Connection' : 'Offline'}
-                         </span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-2">
-                         {website.domain}
-                         {website.managerId?.name && (
-                            <>
-                               <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
-                               <span className="text-indigo-400 font-black px-2 py-0.5 bg-indigo-50 rounded-md truncate max-w-[120px]" title={website.managerId.name}>
-                                 Client: {website.managerId.name}
-                               </span>
-                            </>
-                         )}
-                      </p>
-                   </div>
-                </div>
-                <div className="flex gap-3 relative z-10 shrink-0">
-                   <button 
-                     onClick={() => handleEdit(website)}
-                     className="px-6 py-3.5 rounded-2xl bg-white text-slate-600 font-bold text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm border border-slate-200 flex items-center gap-2 hover:scale-105"
-                   >
-                      <Settings size={14} /> Configure
-                   </button>
-                </div>
-             </div>
-             
-             <div className="p-8 bg-slate-50/30 grid grid-cols-1 xl:grid-cols-3 gap-8 items-start relative z-10">
-                 <div className="xl:col-span-2 space-y-4">
-                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Deployment Snippet</span>
-                     <div className="relative group/copy">
-                        <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl p-6 font-mono text-[11px] leading-relaxed flex items-start gap-5 pr-16 shadow-2xl relative overflow-hidden transition-colors">
-                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-60"></div>
-                           <div className="text-slate-700 select-none hidden sm:block text-right pt-[1px]">1<br/>2<br/>3<br/>4<br/>5<br/>6<br/>7<br/>8</div>
-                           <div className="text-emerald-100/90 whitespace-pre-wrap break-all w-full overflow-x-auto selection:bg-indigo-500/30">
-                              {`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`}
-                           </div>
-                        </div>
-                        <button 
-                           onClick={() => handleCopy(`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`, website._id)}
-                           className="absolute right-4 top-1/2 -translate-y-1/2 p-3.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl backdrop-blur-md shadow-xl hover:scale-110 active:scale-95 transition-all outline-none border border-white/5 disabled:opacity-50"
-                        >
-                           {copiedId === website._id ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                        </button>
-                     </div>
-                 </div>
+      <div className="grid grid-cols-1 gap-10">
+        {getPaginationMeta(websites, page).pageItems.map((website) => (
+          <div key={website._id} className={`premium-card p-0 overflow-hidden group hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.2)] transition-all duration-700 bg-white dark:bg-slate-900 border-2 ${website.isActive !== false ? 'border-transparent dark:border-white/5 hover:border-indigo-100 dark:hover:border-indigo-500/30' : 'border-slate-100 dark:border-white/5 opacity-70 grayscale hover:grayscale-0'}`}>
+            <div className="p-10 border-b border-slate-50 dark:border-white/5 flex flex-col xl:flex-row xl:items-center justify-between gap-8 relative transition-colors">
+              {website.isActive === false && <div className="absolute inset-0 bg-slate-50/40 dark:bg-black/40 z-0"></div>}
 
-                 <div className="xl:col-span-1 grid grid-cols-2 xl:grid-cols-1 gap-5">
-                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm shadow-slate-200/50 space-y-3 hover:-translate-y-1 transition-transform xl:aspect-auto aspect-square flex flex-col justify-center">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div> Auth Hash
+              <div className="flex items-center gap-8 relative z-10 transition-transform group-hover:translate-x-1 duration-500">
+                <div
+                  className="w-20 h-20 rounded-[28px] flex items-center justify-center text-4xl shadow-2xl transition-all group-hover:rotate-6 shrink-0 border border-white/10"
+                  style={{ backgroundColor: website.primaryColor, color: '#fff' }}
+                >
+                  <Globe size={32} />
+                </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-4">
+                    <h4 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{website.websiteName}</h4>
+                    <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] rounded-lg shadow-sm ${website.isActive !== false ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+                      {website.isActive !== false ? 'Live' : 'Paused'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest flex items-center gap-2">
+                      {website.domain}
+                    </p>
+                    {website.managerId?.name && (
+                      <>
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+                        <span className="text-[9px] text-indigo-500 dark:text-indigo-400 font-black px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg uppercase tracking-widest">
+                          Master: {website.managerId.name}
                         </span>
-                        <p className="text-[11px] font-black text-slate-900 font-mono truncate bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-100">{website.apiKey.substring(0, 15)}...</p>
-                     </div>
-                     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm shadow-slate-200/50 space-y-4 hover:-translate-y-1 transition-transform xl:aspect-auto aspect-square flex flex-col justify-center">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 rounded-full bg-pink-400"></div> Launcher 
-                        </span>
-                        <div className="flex items-center gap-4">
-                           <div className="w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center text-xl hover:scale-110 transition-transform" style={{ backgroundColor: website.primaryColor, color: '#fff' }}>
-                              <span className="drop-shadow-sm">{website.launcherIcon}</span>
-                           </div>
-                           <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-tight">Live<br/>Preview</span>
-                        </div>
-                     </div>
-                 </div>
-             </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 relative z-10 shrink-0">
+                <button
+                  onClick={() => setCustomizingWebsite(website)}
+                  className="px-8 py-4.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-500/10 flex items-center gap-3 hover:scale-105 active:scale-95"
+                >
+                  <Palette size={16} /> Design System
+                </button>
+                <button
+                  onClick={() => handleEdit(website)}
+                  className="px-8 py-4.5 rounded-2xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black text-[11px] uppercase tracking-[0.2em] hover:bg-slate-950 dark:hover:bg-black hover:text-white transition-all shadow-sm border border-slate-200 dark:border-white/5 flex items-center gap-3 hover:scale-105 active:scale-95"
+                >
+                  <Settings size={16} /> Configure
+                </button>
+                <button className="p-4.5 bg-red-50 dark:bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-sm border border-red-100 dark:border-red-500/10 hover:scale-105">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-10 bg-slate-50/30 dark:bg-black/10 grid grid-cols-1 xl:grid-cols-12 gap-12 items-start relative z-10 transition-colors">
+              <div className="xl:col-span-8 space-y-5">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em]">Quantum Deployment Snippet</span>
+                  <div className="flex gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse delay-75"></div>
+                    <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse delay-150"></div>
+                  </div>
+                </div>
+                <div className="relative group/copy">
+                  <div className="bg-[#0f172a] dark:bg-black border border-slate-800 dark:border-white/5 rounded-[32px] p-8 font-mono text-[12px] leading-relaxed flex items-start gap-8 pr-20 shadow-2xl relative overflow-hidden transition-all group-hover/copy:border-indigo-500/50">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-60"></div>
+                    <div className="text-slate-700/50 select-none hidden sm:block text-right pt-[2px] font-black">01<br />02<br />03<br />04<br />05<br />06<br />07</div>
+                    <div className="text-indigo-100/90 whitespace-pre-wrap break-all w-full overflow-x-auto selection:bg-indigo-500/40 tracking-tight">
+                      {`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(`<script>\n  (function(){\n    var s = document.createElement("script");\n    s.src = "${API_BASE}/chat-widget.js";\n    s.setAttribute("data-api-key", "${website.apiKey}");\n    document.body.appendChild(s);\n  })();\n</script>`, website._id)}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-white/10 hover:bg-indigo-600 text-white rounded-2xl backdrop-blur-xl shadow-2xl hover:scale-110 active:scale-90 transition-all outline-none border border-white/10 flex items-center justify-center group-hover/copy:bg-indigo-500"
+                  >
+                    {copiedId === website._id ? <Check size={20} className="text-emerald-400" /> : <Copy size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="xl:col-span-4 grid grid-cols-2 xl:grid-cols-1 gap-6 h-full">
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-white/5 shadow-xl shadow-slate-200/20 dark:shadow-none space-y-4 hover:-translate-y-1 transition-all flex flex-col justify-center">
+                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Secret Key
+                  </span>
+                  <div className="bg-slate-50 dark:bg-black/20 px-5 py-3 rounded-xl border border-slate-100 dark:border-white/5 font-mono text-[11px] font-black text-slate-900 dark:text-indigo-300 truncate tracking-tight">
+                    {website.apiKey}
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-8 rounded-[32px] border border-slate-200 dark:border-white/5 shadow-xl shadow-slate-200/20 dark:shadow-none space-y-4 hover:-translate-y-1 transition-all flex flex-col justify-center">
+                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-pink-500"></div> Icon State
+                  </span>
+                  <div className="flex items-center gap-6">
+                    <div className="w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-all border-2 border-white dark:border-slate-800 shrink-0" style={{ backgroundColor: website.primaryColor, color: '#fff' }}>
+                      <span className="drop-shadow-lg">{website.launcherIcon}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-tight">Verified</p>
+                      <p className="text-[9px] text-slate-400 dark:text-slate-600 font-bold uppercase truncate">Protocol Asset</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         ))}
         {websites.length === 0 && !isAdding && (
-          <div className="p-32 border-2 border-dashed border-slate-200/60 rounded-[48px] text-center space-y-6 bg-slate-50/30">
-             <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-20"></div>
-                <div className="absolute inset-2 bg-indigo-50 rounded-full animate-pulse"></div>
-                <Globe size={40} className="text-indigo-400 relative z-10" />
-             </div>
-             <div className="space-y-2">
-                <h3 className="text-lg font-black text-slate-900 tracking-tight uppercase">Ready for Deployment</h3>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">Add your first domain to generate widget credentials.</p>
-             </div>
+          <div className="p-40 border-4 border-dashed border-slate-100 dark:border-white/5 rounded-[64px] text-center space-y-8 bg-slate-50/30 dark:bg-white/5 transition-colors">
+            <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
+              <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-10"></div>
+              <div className="absolute inset-4 bg-indigo-500/10 rounded-full animate-pulse"></div>
+              <Globe size={48} className="text-indigo-600 dark:text-indigo-400 relative z-10" />
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Ecosystem Vacuum</h3>
+              <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] max-w-sm mx-auto leading-relaxed">No active domains detected. Register a terminal to begin multi-website support deployment.</p>
+            </div>
           </div>
         )}
       </div>
+      <PaginationControls
+        currentPage={getPaginationMeta(websites, page).currentPage}
+        totalPages={getPaginationMeta(websites, page).totalPages}
+        totalItems={getPaginationMeta(websites, page).totalItems}
+        itemLabel="websites"
+        onPageChange={setPage}
+      />
     </div>
   );
 }

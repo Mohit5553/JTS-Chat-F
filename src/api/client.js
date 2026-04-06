@@ -6,8 +6,9 @@ const API_BASE = (
 
 export async function api(path, options = {}) {
   const token = localStorage.getItem("dashboard_token");
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...(options.headers || {})
   };
 
