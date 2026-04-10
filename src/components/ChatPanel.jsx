@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "../api/client.js";
-import { Paperclip, FileText, Check, CheckCheck, Send, Ticket } from "lucide-react";
+import { Paperclip, FileText, Check, CheckCheck, Send, Ticket, PlusCircle, UserPlus } from "lucide-react";
 
 function getDeviceIcon(deviceInfo = "") {
   if (/mobile|android|iphone/i.test(deviceInfo)) return "📱";
@@ -40,7 +40,7 @@ const linkify = (text = "") => {
   });
 };
 
-export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled, onConvertToTicket, canUseShortcuts = true }) {
+export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled, onConvertToTicket, onConvertToLead, canUseShortcuts = true }) {
   const [draft, setDraft] = useState("");
   const viewportRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -220,6 +220,16 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
           </div>
 
           <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0 w-full sm:w-auto">
+            {onConvertToLead && !session.customerId ? (
+              <button
+                onClick={() => onConvertToLead(session)}
+                className="p-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 rounded-2xl flex items-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all shadow-sm group"
+                title="Convert to CRM Lead"
+              >
+                <UserPlus size={18} className="group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Convert to Lead</span>
+              </button>
+            ) : null}
             {onConvertToTicket ? (
               <button
                 onClick={() => onConvertToTicket(session)}

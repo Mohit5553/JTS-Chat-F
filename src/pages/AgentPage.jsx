@@ -501,21 +501,21 @@ export default function AgentPage() {
         />
         
         {selectedSession && selectedSession.status !== "closed" && (
-          <div className="premium-card p-8 flex items-center justify-between gap-6 animate-in zoom-in-95 duration-500">
+          <div className="premium-card p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="space-y-1">
               <h3 className="heading-md">Session Control</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest max-w-xs">
                 {isBasicUser ? "Reply to and close your assigned chats." : "Convert this chat to a ticket or close the session."}
               </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
               {!isBasicUser ? (
                 <>
                   {canUseTickets ? (
                     <button
                       type="button"
                       onClick={() => setHistoryModal(true)}
-                      className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm flex items-center gap-2 relative"
+                      className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all shadow-sm flex items-center gap-2 relative whitespace-nowrap"
                     >
                       <History size={14} /> Customer Profile
                       {customerHistory?.tickets?.some(t => t.status === 'open') && (
@@ -527,7 +527,7 @@ export default function AgentPage() {
                     <button
                       type="button"
                       onClick={() => { setTicketModal(true); setTicketResult(null); }}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-200 flex items-center gap-2"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-200 flex items-center gap-2 whitespace-nowrap"
                     >
                       <Ticket size={14} /> Generate Ticket
                     </button>
@@ -537,7 +537,7 @@ export default function AgentPage() {
               <button
                 type="button"
                 onClick={closeChat}
-                className="bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-100 text-slate-500 px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all"
+                className="bg-slate-50 border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-100 text-slate-500 px-5 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] transition-all whitespace-nowrap"
               >
                 Close Session
               </button>

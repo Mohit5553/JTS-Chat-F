@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api/client.js";
 import CRMManager from "../components/CRMManager.jsx";
+import InsightsPanel from "../components/InsightsPanel.jsx";
 import PaginationControls from "../components/PaginationControls.jsx";
 import Layout from "../components/Layout.jsx";
 import { getPaginationMeta } from "../utils/pagination.js";
@@ -10,8 +11,17 @@ import {
   Activity,
   MessageCircle,
   FileText,
-  CheckSquare
+  CheckSquare,
+  Clock,
+  Calendar,
+  Phone,
+  Mail,
+  Zap,
+  ArrowRight,
+  ChevronRight,
+  ArrowLeft
 } from "lucide-react";
+import ChatPanel from "../components/ChatPanel.jsx";
 import { hasModule } from "../utils/planAccess.js";
 
 function SessionStatusBadge({ status }) {
@@ -28,42 +38,66 @@ function SessionStatusBadge({ status }) {
   );
 }
 
-function SalesChatsPanel() {
+function SalesChatsPanel({ onConvertToLead }) {
   const [sessions, setSessions] = useState([]);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
       try {
         const data = await api("/api/chat/sessions");
-        if (!cancelled) {
-          setSessions(Array.isArray(data) ? data : []);
-        }
+        if (!cancelled) setSessions(Array.isArray(data) ? data : []);
       } catch (err) {
-        if (!cancelled) {
-          setError(err.message || "Failed to load sales chats");
-        }
+        if (!cancelled) setError(err.message || "Failed to load sales chats");
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
-
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!selectedSession) return;
+    let cancelled = false;
+    async function loadMessages() {
+      setLoadingMessages(true);
+      try {
+        const data = await api(`/api/chat/sessions/${selectedSession.sessionId}/messages`);
+        if (!cancelled) setMessages(data);
+      } catch (err) {
+        console.error("Failed to load messages", err);
+      } finally {
+        if (!cancelled) setLoadingMessages(false);
+      }
+    }
+    loadMessages();
+    return () => { cancelled = true; };
+  }, [selectedSession]);
+
+  const handleSendMessage = async (payload) => {
+    if (!selectedSession) return;
+    try {
+      const msg = await api(`/api/chat/sessions/${selectedSession.sessionId}/messages`, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      setMessages(prev => [...prev, msg]);
+    } catch (err) {
+      alert("Failed to send message: " + err.message);
+    }
+  };
 
   if (loading) {
     return (
       <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400">
-        <p className="text-[10px] font-black uppercase tracking-widest">Loading assigned chats...</p>
+        <p className="text-[10px] font-black uppercase tracking-widest animate-pulse">Synchronizing assigned queue...</p>
       </div>
     );
   }
@@ -80,8 +114,29 @@ function SalesChatsPanel() {
     return (
       <div className="p-10 border-2 border-dashed border-slate-200 rounded-3xl text-center text-slate-400">
         <Activity size={40} className="mx-auto mb-4 opacity-50" />
-        <h2 className="text-xl font-bold text-slate-600">No active sales chats</h2>
-        <p className="text-sm mt-2">Only chats assigned to this sales user appear here.</p>
+        <h2 className="text-xl font-bold text-slate-600 uppercase tracking-tight">No active sales chats</h2>
+        <p className="text-sm font-bold mt-2">Only chats assigned to this sales user appear here.</p>
+      </div>
+    );
+  }
+
+  if (selectedSession) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+        <button
+          onClick={() => setSelectedSession(null)}
+          className="flex items-center gap-2.5 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
+        >
+          <ArrowLeft size={14} /> Back to Lead Queue
+        </button>
+        <ChatPanel
+          session={selectedSession}
+          messages={messages}
+          onSend={handleSendMessage}
+          onTyping={() => { }}
+          isTyping={false}
+          onConvertToLead={() => onConvertToLead(selectedSession)}
+        />
       </div>
     );
   }
@@ -89,35 +144,46 @@ function SalesChatsPanel() {
   const paginatedSessions = getPaginationMeta(sessions, page);
 
   return (
-    <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
+    <div className="grid grid-cols-1 gap-4 animate-in slide-in-from-bottom-4 duration-700">
       {paginatedSessions.pageItems.map((session) => (
-        <div key={session._id} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2 min-w-0">
-              <div className="flex items-center gap-2">
-                <MessageCircle size={16} className="text-emerald-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {session.websiteId?.websiteName || "Website"}
-                </span>
+        <div
+          key={session._id}
+          onClick={() => setSelectedSession(session)}
+          className="bg-white rounded-[32px] border border-slate-200 shadow-sm p-8 cursor-pointer hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-500/5 transition-all group relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-100 transition-opacity">
+             <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg"><MessageCircle size={20} /></div>
+          </div>
+          <div className="flex items-start justify-between gap-6">
+            <div className="space-y-4 min-w-0 flex-1">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-xl">
+                   {session.visitorId?.name?.[0] || "V"}
+                </div>
+                <div>
+                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                     {session.visitorId?.name || "Anonymous visitor"}
+                   </h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                     {session.websiteId?.websiteName || "Website"}
+                   </p>
+                </div>
               </div>
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
-                {session.visitorId?.name || "Anonymous visitor"}
-              </h3>
-              <p className="text-[10px] font-bold text-slate-400 break-all">
-                {session.visitorId?.email || session.visitorId?.visitorId || "No visitor contact"}
-              </p>
-              <p className="text-[11px] font-medium text-slate-600 line-clamp-2">
-                {session.lastMessagePreview || "No preview available yet."}
-              </p>
-            </div>
-            <div className="text-right space-y-2 shrink-0">
-              <SessionStatusBadge status={session.status} />
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                {new Date(session.updatedAt || session.createdAt).toLocaleDateString()}
-              </p>
-              <p className="text-[9px] font-bold text-slate-400">
-                {new Date(session.updatedAt || session.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </p>
+              
+              <div className="space-y-1">
+                 <p className="text-[10px] font-bold text-slate-400 break-all">{session.visitorId?.email || session.visitorId?.visitorId || "No contact info"}</p>
+                 <p className="text-[12px] font-medium text-slate-600 line-clamp-1 italic">
+                   "{session.lastMessagePreview || "Waiting for interaction..."}"
+                 </p>
+              </div>
+
+              <div className="flex items-center gap-4 pt-2">
+                 <SessionStatusBadge status={session.status} />
+                 <div className="flex items-center gap-2 text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                    <Clock size={12} />
+                    {new Date(session.updatedAt || session.createdAt).toLocaleDateString()} at {new Date(session.updatedAt || session.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                 </div>
+              </div>
             </div>
           </div>
         </div>
@@ -133,13 +199,163 @@ function SalesChatsPanel() {
   );
 }
 
+function GlobalTasksPanel() {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await api("/api/crm/tasks/my");
+        setTasks(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load global tasks", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return <div className="p-10 text-center text-slate-400 font-bold text-[10px] uppercase tracking-widest animate-pulse">Synchronizing action items...</div>;
+
+  if (tasks.length === 0) {
+    return (
+      <div className="p-16 border-2 border-dashed border-slate-200 rounded-[40px] bg-slate-50 text-center mt-6">
+        <CheckSquare size={48} className="mx-auto mb-4 text-slate-200" />
+        <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Zero pending actions</h3>
+        <p className="text-sm font-bold text-slate-500 mt-2">All your follow-ups are completed. Great work!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-bottom-4 duration-700 mt-6">
+      {tasks.map(task => (
+        <div key={task._id} className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all group overflow-hidden relative">
+          <div className="flex items-start gap-4">
+             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                task.status === "completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-indigo-50 text-indigo-600 border border-indigo-100"
+             }`}>
+                {task.type === "call" ? <Phone size={20} /> : task.type === "email" ? <Mail size={20} /> : <CheckSquare size={20} />}
+             </div>
+             <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{task.type}</p>
+                   <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                      task.customerId?.priority === "high" ? "bg-rose-50 text-rose-500 border-rose-100" : "bg-slate-50 text-slate-400 border-slate-200"
+                   }`}>{task.customerId?.priority || "Medium"}</span>
+                </div>
+                <h4 className="text-sm font-black text-slate-900 truncate uppercase tracking-tight">{task.title}</h4>
+                <p className="text-[11px] font-bold text-indigo-500 truncate mt-1">
+                   {task.customerId?.name} <span className="text-slate-300 mx-1">•</span> {task.customerId?.crn}
+                </p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t border-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                   <span className="flex items-center gap-1.5"><Calendar size={12} /> {new Date(task.dueAt).toLocaleDateString()}</span>
+                   <span className="flex items-center gap-1.5"><Clock size={12} /> {task.status}</span>
+                </div>
+             </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GlobalNotesPanel() {
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await api("/api/crm/notes/my");
+        setNotes(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load global notes", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return <div className="p-10 text-center text-slate-400 font-bold text-[10px] uppercase tracking-widest animate-pulse">Aggregating lead intelligence...</div>;
+
+  if (notes.length === 0) {
+    return (
+      <div className="p-16 border-2 border-dashed border-slate-200 rounded-[40px] bg-slate-50 text-center mt-6">
+        <FileText size={48} className="mx-auto mb-4 text-slate-200" />
+        <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Intelligence empty</h3>
+        <p className="text-sm font-bold text-slate-500 mt-2">Log your first note from any lead profile to see it here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700 mt-6">
+      {notes.map((note, idx) => (
+        <div key={idx} className="bg-white rounded-[32px] border border-slate-200 p-6 shadow-sm hover:border-indigo-100 transition-all group">
+          <div className="flex items-start justify-between gap-4 mb-4">
+             <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-black">
+                   <Zap size={18} />
+                </div>
+                <div>
+                   <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Lead: {note.customerName}</p>
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{note.type || "Note"}</p>
+                </div>
+             </div>
+             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{note.customerCrn}</span>
+             </div>
+          </div>
+          <p className="text-xs font-semibold text-slate-700 leading-relaxed pl-[52px]">
+             {note.text}
+          </p>
+          <div className="mt-4 pt-4 border-t border-slate-50 pl-[52px] flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400">
+             <span className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-slate-100 flex items-center justify-center text-[7px] text-slate-500 font-black">
+                   {note.authorName?.[0] || "?"}
+                </div>
+                {note.authorName}
+             </span>
+             <span className="text-slate-300">{new Date(note.createdAt).toLocaleString()}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
 export default function SalesPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "pipeline";
+  const [initialLeadData, setInitialLeadData] = useState(null);
+  const [highlightLeadId, setHighlightLeadId] = useState(null);
   const canUseCRM = hasModule(user, "crm");
 
+  const handleConvertLead = (session) => {
+    setInitialLeadData({
+      name: session.visitorId?.name || "Anonymous",
+      email: session.visitorId?.email || "",
+      phone: session.visitorId?.phone || "",
+      leadSource: "chat",
+      notes: `Lead converted from chat session: ${session.sessionId || session._id}`,
+      sessionId: session._id
+    });
+    setSearchParams({ tab: "pipeline" });
+  };
+
+  const handleViewLead = (lead) => {
+    setHighlightLeadId(lead._id);
+    setSearchParams({ tab: "pipeline" });
+  };
+
   const menuItems = [
+    { label: "Insights", href: "/sales?tab=insights" },
     { label: "Pipeline", href: "/sales" },
     { label: "Tasks", href: "/sales?tab=tasks" },
     { label: "Notes", href: "/sales?tab=notes" },
@@ -157,10 +373,18 @@ export default function SalesPage() {
     );
   }
 
+  if (activeTab === "insights") {
+    return (
+      <Layout menuItems={menuItems} title="Sales Intelligence" subtitle="Performance metrics and revenue projection">
+         <InsightsPanel onViewLead={handleViewLead} />
+      </Layout>
+    );
+  }
+
   if (activeTab === "chats") {
     return (
       <Layout menuItems={menuItems} title="Sales Chats" subtitle="Manage your assigned visitor conversations">
-         <SalesChatsPanel />
+         <SalesChatsPanel onConvertToLead={handleConvertLead} />
       </Layout>
     );
   }
@@ -168,15 +392,7 @@ export default function SalesPage() {
   if (activeTab === "tasks") {
     return (
       <Layout menuItems={menuItems} title="My Tasks" subtitle="Follow-ups and scheduled activities">
-        <div className="p-12 mt-10 max-w-2xl mx-auto rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-4">
-           <div className="w-16 h-16 rounded-3xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
-             <CheckSquare size={24} className="text-indigo-400" />
-           </div>
-           <h3 className="text-lg font-black text-slate-800 tracking-tight">Tasks are managed per Lead</h3>
-           <p className="text-sm font-medium text-slate-500">
-             To view or create tasks, return to the <strong>Pipeline</strong> tab, select a specific lead, and navigate to the Tasks tab within their intelligence drawer. Global task view is coming soon.
-           </p>
-        </div>
+        <GlobalTasksPanel />
       </Layout>
     );
   }
@@ -184,15 +400,7 @@ export default function SalesPage() {
   if (activeTab === "notes") {
     return (
       <Layout menuItems={menuItems} title="My Notes" subtitle="Internal observations and lead context">
-        <div className="p-12 mt-10 max-w-2xl mx-auto rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-4">
-           <div className="w-16 h-16 rounded-3xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
-             <FileText size={24} className="text-purple-400" />
-           </div>
-           <h3 className="text-lg font-black text-slate-800 tracking-tight">Notes are attached to Leads</h3>
-           <p className="text-sm font-medium text-slate-500">
-             To view or create internal notes, return to the <strong>Pipeline</strong> tab, select a lead, and click the "Intel Notes" tab inside their drawer.
-           </p>
-        </div>
+        <GlobalNotesPanel />
       </Layout>
     );
   }
@@ -204,7 +412,7 @@ export default function SalesPage() {
       title="Sales Pipeline"
       subtitle="Manage your leads, opportunities, and deals"
     >
-      <CRMManager />
+      <CRMManager initialLeadData={initialLeadData} highlightLeadId={highlightLeadId} />
     </Layout>
   );
 }

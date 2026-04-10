@@ -6,14 +6,18 @@ const TYPE_STYLES = {
   assigned: "bg-violet-500",
   transferred: "bg-fuchsia-500",
   note_added: "bg-slate-500",
-  email_sent: "bg-sky-500",
+  call_logged: "bg-sky-500",
+  meeting_logged: "bg-orange-500",
+  manual_email_logged: "bg-indigo-500",
+  email_sent: "bg-sky-600",
   task_created: "bg-emerald-500",
   task_updated: "bg-indigo-500",
   task_completed: "bg-emerald-600",
   duplicate_detected: "bg-rose-500",
   merged: "bg-orange-500",
   comment_added: "bg-slate-700",
-  status_changed: "bg-blue-500"
+  status_changed: "bg-blue-500",
+  page_view: "bg-teal-500"
 };
 
 function formatMetadataValue(value) {

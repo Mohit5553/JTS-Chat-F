@@ -112,6 +112,22 @@ function PriorityDot({ priority }) {
   );
 }
 
+function HeatIndicator({ score }) {
+  const isHot = score > 70;
+  const isCold = score < 20;
+  
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-black uppercase tracking-widest ${
+      isHot ? "bg-orange-50 text-orange-600 border-orange-100" :
+      isCold ? "bg-blue-50 text-blue-400 border-blue-100" :
+      "bg-slate-50 text-slate-500 border-slate-100"
+    }`}>
+      {isHot ? <Zap size={10} className="animate-pulse" /> : <Clock size={10} />}
+      Score: {score}
+    </div>
+  );
+}
+
 // CRM Pipeline mini-chart shown at the top of the list view
 function CRMPipelineBar({ customers }) {
   const pipelineCounts = customers.reduce((acc, c) => {
@@ -165,7 +181,7 @@ function CRMPipelineBar({ customers }) {
   );
 }
 
-export default function CRMManager({ websiteId = "" }) {
+export default function CRMManager({ websiteId = "", initialLeadData = null, highlightLeadId = null }) {
   const { user } = useAuth();
   const isSales = user?.role === "sales";
   const isManager = user?.role === "manager" || user?.role === "client" || user?.role === "admin";
@@ -200,14 +216,34 @@ export default function CRMManager({ websiteId = "" }) {
   const [noteSuccess, setNoteSuccess] = useState(false);
   const [ownerUpdateError, setOwnerUpdateError] = useState("");
   const [emailDraft, setEmailDraft] = useState({ subject: "", body: "" });
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [creatingLead, setCreatingLead] = useState(false);
+  const [leadActionSuccess, setLeadActionSuccess] = useState(false);
+
+  useEffect(() => {
+    if (initialLeadData) {
+      setEditLeadId(null);
+      setCreateLeadForm({
+        name: initialLeadData.name || "",
+        email: initialLeadData.email || "",
+        phone: initialLeadData.phone || "",
+        companyName: initialLeadData.companyName || "",
+        leadSource: initialLeadData.leadSource || "website",
+        leadValue: initialLeadData.leadValue || "",
+        priority: initialLeadData.priority || "medium",
+        ownerId: initialLeadData.ownerId || user?._id || "",
+        notes: initialLeadData.notes || "",
+        sessionId: initialLeadData.sessionId || ""
+      });
+      setShowCreateLead(true);
+    }
+  }, [initialLeadData, user?._id]);
   const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState(false);
   const [emailAttachment, setEmailAttachment] = useState(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [draggedCustomerId, setDraggedCustomerId] = useState("");
   const [dropTargetStatus, setDropTargetStatus] = useState("");
   const [showCreateLead, setShowCreateLead] = useState(false);
-  const [creatingLead, setCreatingLead] = useState(false);
   const [createLeadError, setCreateLeadError] = useState("");
   const [removeLeadError, setRemoveLeadError] = useState("");
   const [removingLead, setRemovingLead] = useState(false);
@@ -231,9 +267,26 @@ export default function CRMManager({ websiteId = "" }) {
     priority: "medium",
     ownerId: "",
     tags: "",
-    notes: ""
+    notes: "",
+    sessionId: ""
   });
   const [editLeadId, setEditLeadId] = useState(null);
+
+  useEffect(() => {
+    if (highlightLeadId) {
+      const loadAndOpen = async () => {
+        try {
+          const leadData = await api(`/api/crm/${highlightLeadId}`);
+          if (leadData?.customer) {
+            openCustomer(leadData.customer);
+          }
+        } catch (err) {
+          console.error("Failed to open highlighted lead", err);
+        }
+      };
+      loadAndOpen();
+    }
+  }, [highlightLeadId]);
 
   const openEditLead = () => {
     if (!selectedCustomer) return;
@@ -251,7 +304,8 @@ export default function CRMManager({ websiteId = "" }) {
       priority: selectedCustomer.priority || "medium",
       ownerId: selectedCustomer.ownerId?._id || selectedCustomer.ownerId || "",
       tags: selectedCustomer.tags ? selectedCustomer.tags.join(", ") : "",
-      notes: ""
+      notes: "",
+      sessionId: selectedCustomer.sessionId || ""
     });
     setEditLeadId(selectedCustomer._id);
     setShowCreateLead(true);
@@ -504,6 +558,35 @@ ${salesName}`
     }
   };
 
+  const logManualInteraction = async (e) => {
+    e.preventDefault();
+    if (!interactionNote.trim() || !customerDetails?.customer?._id) return;
+    setInteractionSaving(true);
+    try {
+      const updated = await api(`/api/crm/${customerDetails.customer._id}/notes`, {
+        method: "POST",
+        body: JSON.stringify({
+          type: interactionType,
+          content: interactionNote
+        })
+      });
+      syncCustomerState(updated);
+      // Refresh details to ensure Activity Timeline reflects the new log instantly
+      const refreshed = await api(`/api/crm/${customerDetails.customer._id}`);
+      setCustomerDetails(refreshed);
+      setInteractionNote("");
+      setActionMessage({ 
+        type: "success", 
+        text: `${interactionType.charAt(0).toUpperCase() + interactionType.slice(1).replace("_", " ")} logged successfully.` 
+      });
+    } catch (err) {
+      console.error("Interaction logging failed", err);
+      setActionMessage({ type: "error", text: err.message || "Failed to log interaction." });
+    } finally {
+      setInteractionSaving(false);
+    }
+  };
+
   const openTicketCount = customerDetails?.tickets?.filter(t => ["open", "pending", "in_progress"].includes(t.status)).length || 0;
   const boardColumns = [
     { key: "new", label: "New", tone: "from-violet-500 to-fuchsia-500" },
@@ -560,7 +643,8 @@ ${salesName}`
       priority: "medium",
       ownerId: "",
       tags: "",
-      notes: ""
+      notes: "",
+      sessionId: ""
     });
     setCreateLeadError("");
     setEditLeadId(null);
@@ -590,7 +674,9 @@ ${salesName}`
           ownerId: createLeadForm.ownerId || null,
           tags: createLeadForm.tags
             ? createLeadForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
-            : []
+            : [],
+          notes: createLeadForm.notes,
+          sessionId: createLeadForm.sessionId
         };
         // Backend ignores or errors on email updates. Notes are only captured on creation in this form.
         delete payload.email;
@@ -939,6 +1025,20 @@ ${salesName}`
                                 {customer.crn || "No CRN"}
                               </span>
                             </div>
+                            <div className="flex items-center justify-between">
+                                 <HeatIndicator score={customer.heatScore || 0} />
+                                 <div className="flex -space-x-2">
+                                    {customer.ownerId ? (
+                                      <div className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[8px] font-black" title={customer.ownerId.name}>
+                                         {customer.ownerId.name[0]}
+                                      </div>
+                                    ) : (
+                                      <div className="w-6 h-6 rounded-full border-2 border-white bg-slate-50 flex items-center justify-center text-slate-300">
+                                         <User size={10} />
+                                      </div>
+                                    )}
+                                 </div>
+                              </div>
                             <div className="grid grid-cols-2 gap-2">
                               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                                 <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">Expected Value</p>
@@ -998,6 +1098,7 @@ ${salesName}`
                 <thead>
                   <tr className="bg-white border-b border-slate-200">
                     <th className="px-6 py-4 small-label">Opportunity</th>
+                    <th className="px-6 py-4 small-label">Heat</th>
                     <th className="px-6 py-4 small-label">Stage</th>
                     <th className="px-6 py-4 small-label">Status</th>
                     <th className="px-6 py-4 small-label">Owner</th>
@@ -1206,6 +1307,7 @@ ${salesName}`
                   { key: "chats", label: "Chats", icon: MessageCircle, badge: customerDetails?.sessions?.length },
                   { key: "notes", label: "Notes", icon: Tag, badge: customerDetails?.customer?.internalNotes?.length },
                   { key: "tasks", label: "Tasks", icon: Clock, badge: customerDetails?.tasks?.length },
+                  { key: "journey", label: "Journey", icon: Zap },
                   { key: "activity", label: "Timeline", icon: Calendar },
                   { key: "actions", label: "Actions", icon: Zap }
                 ].map((t) => (
@@ -1335,7 +1437,7 @@ ${salesName}`
                         {customerDetails?.tasks?.length > 0 ? customerDetails.tasks.map(task => (
                           <div key={task._id} className={`bg-white rounded-2xl border p-5 flex items-start gap-4 transition-all ${task.status === "completed" ? "bg-slate-50 opacity-60" : "border-slate-100 shadow-sm"}`}>
                             <button
-                              onClick={() => task.status !== "completed" && completeTask(task._id)}
+                              onClick={() => task.status !== "completed" && updateTaskStatus(task._id, "completed")}
                               className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0 ${
                                 task.status === "completed" ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-200 text-transparent hover:border-indigo-400"
                               }`}
@@ -1362,10 +1464,27 @@ ${salesName}`
                       </div>
                     )}
 
+                    {/* ── JOURNEY TAB ── */}
+                    {drawerTab === "journey" && (
+                      <div className="space-y-4">
+                        <div className="bg-teal-50 border border-teal-100 rounded-3xl p-6 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-teal-600 mb-1">Intent Intelligence</p>
+                            <h4 className="text-sm font-black text-teal-900 uppercase tracking-tight">Visitor Website Journey</h4>
+                          </div>
+                          <Zap size={24} className="text-teal-400" />
+                        </div>
+                        <ActivityTimeline 
+                          items={customerDetails?.activity?.filter(a => a.type === "page_view") || []} 
+                          emptyLabel="No page journey recorded yet." 
+                        />
+                      </div>
+                    )}
+
                     {/* ── TIMELINE TAB ── */}
                     {drawerTab === "activity" && (
                       <div className="bg-white rounded-3xl border border-slate-100 p-2 shadow-sm min-h-[400px]">
-                        <ActivityTimeline activity={customerDetails?.activity || []} />
+                        <ActivityTimeline items={customerDetails?.activity?.filter(a => a.type !== "page_view") || []} />
                       </div>
                     )}
 
@@ -1384,7 +1503,7 @@ ${salesName}`
                           </div>
                           <form onSubmit={logManualInteraction} className="space-y-4">
                             <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                              {["call", "meeting", "email"].map(type => (
+                              {["call", "meeting", "manual_email"].map(type => (
                                 <button
                                   key={type}
                                   type="button"
@@ -1393,7 +1512,7 @@ ${salesName}`
                                     interactionType === type ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400"
                                   }`}
                                 >
-                                  {type}
+                                  {type === "manual_email" ? "Email" : type}
                                 </button>
                               ))}
                             </div>
@@ -1425,7 +1544,7 @@ ${salesName}`
                               <p className="text-[9px] font-bold text-slate-400">Plan a follow-up action for this lead.</p>
                             </div>
                           </div>
-                          <form onSubmit={submitFollowUpTask} className="space-y-5">
+                          <form onSubmit={createTask} className="space-y-5">
                             <div className="space-y-1.5">
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Action Description</label>
                               <input
