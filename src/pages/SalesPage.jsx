@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../api/client.js";
 import CRMManager from "../components/CRMManager.jsx";
 import PaginationControls from "../components/PaginationControls.jsx";
+import Layout from "../components/Layout.jsx";
 import { getPaginationMeta } from "../utils/pagination.js";
 import {
   Activity,
-  LogOut,
   MessageCircle,
-  Wallet
+  FileText,
+  CheckSquare
 } from "lucide-react";
 import { hasModule } from "../utils/planAccess.js";
 
@@ -87,7 +89,7 @@ function SalesChatsPanel() {
   const paginatedSessions = getPaginationMeta(sessions, page);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-700">
       {paginatedSessions.pageItems.map((session) => (
         <div key={session._id} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-start justify-between gap-4">
@@ -132,85 +134,77 @@ function SalesChatsPanel() {
 }
 
 export default function SalesPage() {
-  const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState("pipeline");
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "pipeline";
   const canUseCRM = hasModule(user, "crm");
 
+  const menuItems = [
+    { label: "Pipeline", href: "/sales" },
+    { label: "Tasks", href: "/sales?tab=tasks" },
+    { label: "Notes", href: "/sales?tab=notes" },
+    { label: "Chats", href: "/sales?tab=chats" }
+  ];
+
+  if (!canUseCRM && activeTab === "pipeline") {
+    return (
+      <Layout menuItems={menuItems} title="Plan Upgrade Required" subtitle="CRM is available on Pro only">
+        <div className="rounded-[40px] border border-emerald-100 bg-emerald-50 p-12 text-center">
+          <h3 className="text-lg font-black text-emerald-900 uppercase tracking-tight">Pro plan required</h3>
+          <p className="mt-3 text-sm font-bold text-emerald-700">This sales account can only use CRM when the client is on the Pro plan.</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (activeTab === "chats") {
+    return (
+      <Layout menuItems={menuItems} title="Sales Chats" subtitle="Manage your assigned visitor conversations">
+         <SalesChatsPanel />
+      </Layout>
+    );
+  }
+
+  if (activeTab === "tasks") {
+    return (
+      <Layout menuItems={menuItems} title="My Tasks" subtitle="Follow-ups and scheduled activities">
+        <div className="p-12 mt-10 max-w-2xl mx-auto rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-4">
+           <div className="w-16 h-16 rounded-3xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
+             <CheckSquare size={24} className="text-indigo-400" />
+           </div>
+           <h3 className="text-lg font-black text-slate-800 tracking-tight">Tasks are managed per Lead</h3>
+           <p className="text-sm font-medium text-slate-500">
+             To view or create tasks, return to the <strong>Pipeline</strong> tab, select a specific lead, and navigate to the Tasks tab within their intelligence drawer. Global task view is coming soon.
+           </p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (activeTab === "notes") {
+    return (
+      <Layout menuItems={menuItems} title="My Notes" subtitle="Internal observations and lead context">
+        <div className="p-12 mt-10 max-w-2xl mx-auto rounded-[32px] border-2 border-dashed border-slate-200 bg-slate-50 text-center flex flex-col items-center justify-center space-y-4">
+           <div className="w-16 h-16 rounded-3xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
+             <FileText size={24} className="text-purple-400" />
+           </div>
+           <h3 className="text-lg font-black text-slate-800 tracking-tight">Notes are attached to Leads</h3>
+           <p className="text-sm font-medium text-slate-500">
+             To view or create internal notes, return to the <strong>Pipeline</strong> tab, select a lead, and click the "Intel Notes" tab inside their drawer.
+           </p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // default: pipeline
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden">
-      <div className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 rounded-r-3xl my-2 shadow-[20px_0_40px_-15px_rgba(0,0,0,0.1)] relative z-20">
-        <div className="p-8 pb-4">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
-            <h1 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
-              Sales <span className="text-white">Command</span>
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 space-y-1">
-          {canUseCRM ? (
-            <button
-              onClick={() => setActiveTab("pipeline")}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all text-xs font-bold ${
-                activeTab === "pipeline"
-                  ? "bg-emerald-600/10 text-emerald-400 border border-emerald-500/20"
-                  : "hover:bg-slate-800/50 hover:text-slate-200 border border-transparent"
-              }`}
-            >
-              <Wallet size={16} />
-              Pipeline
-            </button>
-          ) : null}
-
-          <button
-            onClick={() => setActiveTab("chats")}
-            className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all text-xs font-bold ${
-              activeTab === "chats"
-                ? "bg-emerald-600/10 text-emerald-400 border border-emerald-500/20"
-                : "hover:bg-slate-800/50 hover:text-slate-200 border border-transparent"
-            }`}
-          >
-            <Activity size={16} />
-            Active Sales Chats
-          </button>
-        </div>
-
-        <div className="p-4 mt-auto">
-          <div className="bg-slate-950/50 rounded-2xl p-4 border border-slate-800/50 mb-4 shadow-inner">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-800 flex items-center justify-center font-black text-white shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
-                {user?.name?.[0]?.toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{user?.name}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mt-1">Sales Exec</p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-slate-800/50 hover:bg-red-500/10 text-slate-400 hover:text-red-400 font-bold transition-all border border-transparent hover:border-red-500/20 text-[10px] uppercase tracking-widest"
-          >
-            <LogOut size={14} />
-            Output
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <div className="p-8 max-w-7xl mx-auto w-full">
-          {activeTab === "pipeline" && canUseCRM ? <CRMManager /> : null}
-          {activeTab === "pipeline" && !canUseCRM ? (
-            <div className="rounded-[40px] border border-emerald-100 bg-emerald-50 p-12 text-center">
-              <h3 className="text-lg font-black text-emerald-900 uppercase tracking-tight">Pro plan required</h3>
-              <p className="mt-3 text-sm font-bold text-emerald-700">This sales account can only use CRM when the client is on the Pro plan.</p>
-            </div>
-          ) : null}
-          {activeTab === "chats" && <SalesChatsPanel />}
-        </div>
-      </div>
-    </div>
+    <Layout
+      menuItems={menuItems}
+      title="Sales Pipeline"
+      subtitle="Manage your leads, opportunities, and deals"
+    >
+      <CRMManager />
+    </Layout>
   );
 }

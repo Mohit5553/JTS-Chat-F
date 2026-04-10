@@ -1,15 +1,16 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Users, Globe, Headphones,
   MessageSquare, BarChart, ChevronLeft, ChevronRight, LogOut,
-  Sun, Moon, Bell, Search, Check, Trash2, ExternalLink, Ticket, AlertCircle, Clock,
-  Contact, CreditCard, ShieldCheck
+  Sun, Moon, Bell, Ticket, AlertCircle, Clock, Menu, X,
+  Contact, CreditCard, ShieldCheck, ExternalLink
 } from "lucide-react";
 import { api } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
 
+/* ── helpers ──────────────────────────────────────── */
 function getInitials(name = "") {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -22,9 +23,9 @@ function getAvatarColor(name = "") {
     "from-teal-500 to-cyan-500",
     "from-blue-500 to-indigo-500",
   ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return colors[Math.abs(hash) % colors.length];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return colors[Math.abs(h) % colors.length];
 }
 
 const iconMap = {
@@ -38,307 +39,488 @@ const iconMap = {
   "History": Clock,
   "Historical Archive": Clock,
   "Reports": BarChart,
+  "Tickets": Ticket,
+  "Departments": Globe,
+  "Categories": Globe,
   "CRM": Contact,
   "Billing": CreditCard,
-  "Subscriptions": ShieldCheck
+  "Subscriptions": ShieldCheck,
+  "Security": ShieldCheck,
 };
 
+/* ── nav link ─────────────────────────────────────── */
+function SideNavLink({ item, collapsed, onNavigate }) {
+  const Icon = iconMap[item.label] || LayoutDashboard;
+  return (
+    <NavLink
+      to={item.href}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `relative flex items-center gap-3 rounded-2xl transition-all duration-200 group
+         ${collapsed ? "justify-center px-0 py-3" : "px-4 py-2.5"}
+         ${isActive
+           ? "bg-indigo-600/20 text-indigo-300"
+           : "text-slate-400 hover:text-white hover:bg-white/5"
+         }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          {isActive && (
+            <div className="absolute left-0 w-1 h-6 bg-indigo-500 rounded-r-full shadow-[0_0_12px_rgba(99,102,241,0.7)]" />
+          )}
+          <Icon
+            size={collapsed ? 22 : 17}
+            className={`shrink-0 transition-transform duration-200 group-hover:scale-110
+              ${isActive ? "text-indigo-300" : "text-slate-400 group-hover:text-white"}`}
+          />
+          {!collapsed && (
+            <span className="text-[11px] font-black uppercase tracking-[0.12em] truncate">
+              {item.label}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+/* ── sidebar content (shared between desktop + mobile drawer) ── */
+function SidebarContent({ links, collapsed, onNavigate, user, isDarkMode, setIsDarkMode, logout }) {
+  const role = user?.role;
+  return (
+    <div className="flex flex-col h-full">
+      {/* Branding */}
+      <div className={`flex items-center px-6 py-5 shrink-0 ${collapsed ? "justify-center px-2" : ""}`}>
+        {collapsed ? (
+          <div className="w-10 h-10 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-xl shadow-lg flex items-center justify-center font-black text-white text-xs">
+            JTS
+          </div>
+        ) : (
+          <div className="animate-fade-in">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Command Center</span>
+            </div>
+            <h1 className="text-xl font-black text-white tracking-tight leading-none">
+              JTS <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400 italic">Support</span>
+            </h1>
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav
+        aria-label="Sidebar navigation"
+        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 space-y-0.5 pb-4"
+      >
+        {links.map(item => (
+          <SideNavLink key={item.label} item={item} collapsed={collapsed} onNavigate={onNavigate} />
+        ))}
+      </nav>
+
+      {/* User panel */}
+      <div className={`mx-3 mb-4 shrink-0 rounded-2xl border border-white/5 bg-white/5 backdrop-blur-sm ${collapsed ? "p-2" : "p-4"}`}>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className={`w-10 h-10 rounded-xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs select-none border border-white/10`}
+              title={user?.name}
+            >
+              {getInitials(user?.name || "")}
+            </div>
+            <button
+              onClick={() => setIsDarkMode(d => !d)}
+              title={isDarkMode ? "Light mode" : "Dark mode"}
+              className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-xl transition-all"
+            >
+              {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs select-none shrink-0 border border-white/10`}>
+                {getInitials(user?.name || "")}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-black text-white truncate">{user?.name}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate">
+                  {role === "admin" ? "Global Admin" : role}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsDarkMode(d => !d)}
+                title="Toggle theme"
+                className="flex-1 flex items-center justify-center py-2 rounded-xl text-slate-400 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 transition-all"
+              >
+                {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+              </button>
+              <button
+                onClick={logout}
+                title="Sign out"
+                className="flex-1 flex items-center justify-center py-2 rounded-xl text-slate-400 hover:text-rose-400 bg-white/5 border border-white/5 hover:border-rose-400/20 transition-all group"
+              >
+                <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── main layout ──────────────────────────────────── */
 export default function Layout({ title, subtitle, children, menuItems = [] }) {
   const { user, logout } = useAuth();
+  const socket = useSocket();
+
+  // Desktop: collapsed/expanded sidebar
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Mobile: drawer open/closed
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState("all");
-  const socket = useSocket();
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
-
   const role = user?.role;
-  const isOwner = role === "client" || role === "admin";
 
+  /* Dark mode */
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
-  const fetchNotifications = async () => {
-    try {
-      const query = notificationFilter !== "all" ? `?type=${notificationFilter}` : "";
-      const data = await api(`/api/notifications${query}`);
-      setNotifications(data);
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
-    }
-  };
-
+  /* Close mobile drawer on resize to desktop */
   useEffect(() => {
-    fetchNotifications();
+    const handleResize = () => { if (window.innerWidth >= 1024) setMobileOpen(false); };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  /* Lock body scroll when mobile drawer open */
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
+  /* Notifications */
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const q = notificationFilter !== "all" ? `?type=${notificationFilter}` : "";
+      setNotifications(await api(`/api/notifications${q}`));
+    } catch { /* silent */ }
   }, [notificationFilter]);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
   useEffect(() => {
     if (!socket) return;
-    socket.on("notification:new", (notification) => {
-      setNotifications(prev => [notification, ...prev]);
-      // Optional: Browser Native Notification
-      if (Notification.permission === "granted") {
-        new Notification(notification.title, { body: notification.message });
-      }
-    });
-    return () => socket.off("notification:new");
+    const handler = (n) => {
+      setNotifications(prev => [n, ...prev]);
+      if (Notification.permission === "granted") new Notification(n.title, { body: n.message });
+    };
+    socket.on("notification:new", handler);
+    return () => socket.off("notification:new", handler);
   }, [socket]);
 
   const markAllRead = async () => {
     try {
       await api("/api/notifications/mark-all-read", { method: "PATCH" });
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch (err) {
-      console.error(err);
-    }
+    } catch { /* silent */ }
   };
 
   const markRead = async (id) => {
     try {
       await api(`/api/notifications/${id}/read`, { method: "PATCH" });
       setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
-    } catch (err) {
-      console.error(err);
-    }
+    } catch { /* silent */ }
   };
 
-  const fallbackMenuItems = role === "admin"
-    ? [
-      { label: "Dashboard", href: "/admin" },
-      { label: "Clients", href: "/admin?tab=clients" },
-      { label: "Websites", href: "/admin?tab=websites" },
-      { label: "Agents", href: "/admin?tab=agents" },
-      { label: "Chats", href: "/admin?tab=chats" },
-      { label: "CRM", href: "/admin?tab=crm" },
-      { label: "History", href: "/admin?tab=history" },
-      { label: "Reports", href: "/admin?tab=reports" }
-    ]
-    : role === "manager"
-      ? [
-        { label: "Dashboard", href: "/manager" },
-        { label: "CRM", href: "/manager?tab=crm" }
-      ]
-      : role === "client"
-        ? [
-          { label: "Dashboard", href: "/client" },
-          { label: "Websites", href: "/client?tab=websites" },
-          { label: "Agents", href: "/client?tab=agents" },
-          { label: "Chats", href: "/client?tab=chats" },
-          { label: "CRM", href: "/client?tab=crm" },
-          { label: "History", href: "/client?tab=history" },
-          { label: "Reports", href: "/client?tab=reports" }
-        ]
-        : [
-          { label: "Dashboard", href: "/agent" },
-          { label: "Assigned Chats", href: "/agent?tab=chats" }
-        ];
+  /* Menu items */
+  const fallback = role === "admin" ? [
+    { label: "Dashboard", href: "/admin" },
+    { label: "Clients", href: "/admin?tab=clients" },
+    { label: "Websites", href: "/admin?tab=websites" },
+    { label: "Agents", href: "/admin?tab=agents" },
+    { label: "Chats", href: "/admin?tab=chats" },
+    { label: "Tickets", href: "/admin?tab=tickets" },
+    { label: "CRM", href: "/admin?tab=crm" },
+    { label: "Departments", href: "/admin?tab=departments" },
+    { label: "Categories", href: "/admin?tab=categories" },
+    { label: "Shortcuts", href: "/admin?tab=shortcuts" },
+    { label: "Reports", href: "/admin?tab=reports" },
+    { label: "Historical Archive", href: "/admin?tab=history" },
+    { label: "Security", href: "/admin?tab=security" },
+    { label: "Subscriptions", href: "/admin?tab=subscriptions" },
+  ] : role === "manager" ? [
+    { label: "Dashboard", href: "/manager" },
+    { label: "CRM", href: "/manager?tab=crm" },
+  ] : role === "client" ? [
+    { label: "Dashboard", href: "/client" },
+    { label: "Websites", href: "/client?tab=websites" },
+    { label: "Agents", href: "/client?tab=agents" },
+    { label: "Chats", href: "/client?tab=chats" },
+    { label: "CRM", href: "/client?tab=crm" },
+    { label: "History", href: "/client?tab=history" },
+    { label: "Reports", href: "/client?tab=reports" },
+  ] : [
+    { label: "Dashboard", href: "/agent" },
+    { label: "Assigned Chats", href: "/agent?tab=chats" },
+  ];
 
-  const links = menuItems.length ? menuItems : fallbackMenuItems;
+  const links = menuItems.length ? menuItems : fallback;
+  const sidebarProps = { links, user, isDarkMode, setIsDarkMode, logout };
 
   return (
-    <div className="flex h-screen bg-[var(--bg-main)] text-slate-900 dark:text-slate-100 font-sans selection:bg-indigo-500/30 overflow-hidden transition-colors duration-500">
-      {/* Sidebar */}
-      <aside className={`glass-sidebar flex flex-col shadow-2xl flex-shrink-0 relative z-50 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isCollapsed ? 'w-24' : 'w-72'}`}>
+    <div className="flex h-screen bg-[var(--bg-main)] text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
 
-        {/* Toggle Button */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-8 bg-indigo-600 border border-white/10 text-white rounded-full p-1.5 shadow-xl z-50 transition-all hover:scale-110 active:scale-95"
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
+      {/* ── Mobile Overlay ─────────────────────────── */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-        {/* Top Header / Branding */}
-        <div className={`p-8 pb-6 flex items-center ${isCollapsed ? 'justify-center px-0' : ''}`}>
-          {isCollapsed ? (
-            <div className="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-indigo-400 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.4)] flex items-center justify-center font-black text-white text-sm">JTS</div>
-          ) : (
-            <div className="animate-fade-in">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.8)] animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300 drop-shadow-sm">Command Center</span>
-              </div>
-              <h1 className="text-2xl font-black text-white tracking-tighter flex items-center gap-2 leading-none">
-                JTS <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400 italic">Support</span>
-              </h1>
+      {/* ── Mobile Drawer ──────────────────────────── */}
+      <aside
+        aria-label="Mobile navigation"
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 glass-sidebar flex flex-col shadow-2xl
+          transform transition-transform duration-300 ease-in-out
+          lg:hidden
+          ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Command Center</span>
             </div>
-          )}
+            <h1 className="text-lg font-black text-white tracking-tight leading-none">
+              JTS <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400 italic">Support</span>
+            </h1>
+          </div>
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 transition-all"
+            aria-label="Close menu"
+          >
+            <X size={18} />
+          </button>
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 min-h-0 px-4 space-y-1 overflow-y-auto mt-5 custom-scrollbar pb-6" aria-label="Sidebar">
-          {links.map((item) => {
-            const Icon = iconMap[item.label] || LayoutDashboard;
-            return (
-              <NavLink
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <nav aria-label="Mobile sidebar navigation" className="px-3 py-3 space-y-0.5">
+            {links.map(item => (
+              <SideNavLink
                 key={item.label}
-                to={item.href}
-                className={({ isActive }) =>
-                  `relative flex items-center ${isCollapsed ? 'justify-center px-0 py-3.5' : 'px-4 py-2.5'} text-[10px] font-black uppercase tracking-[0.15em] rounded-2xl transition-all duration-300 group ${isActive
-                    ? "bg-indigo-600/20 text-indigo-300 shadow-[inset_0_0_20px_rgba(79,70,229,0.1)]"
-                    : "hover:bg-white/5 hover:text-white text-slate-300"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && <div className="absolute left-0 w-1.5 h-6 bg-indigo-500 rounded-r-full shadow-[0_0_15px_rgba(99,102,241,0.8)]" />}
-                    <Icon size={isCollapsed ? 22 : 18} className={`${isCollapsed ? '' : 'mr-4'} transition-transform duration-300 group-hover:scale-110 ${isActive ? 'text-indigo-300 drop-shadow-[0_0_10px_rgba(99,102,241,0.6)]' : 'text-slate-300 group-hover:text-white'}`} />
-                    {!isCollapsed && <span className="z-10">{item.label}</span>}
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        {/* Bottom User Area */}
-        <div className={`mx-4 mb-6 mt-auto shrink-0 transition-all ${isCollapsed ? 'p-2' : 'p-5'} bg-white/5 rounded-[28px] border border-white/5 backdrop-blur-md shadow-inner`}>
-          {isCollapsed ? (
-            <div className="flex flex-col items-center gap-6">
-              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs shadow-2xl select-none shrink-0 border border-white/10`} title={user?.name}>
-                {getInitials(user?.name || "")}
-              </div>
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                className="p-3 text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10 rounded-2xl transition-all"
-              >
-                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
+                item={item}
+                collapsed={false}
+                onNavigate={() => setMobileOpen(false)}
+              />
+            ))}
+          </nav>
+        </div>
+        {/* user panel in mobile */}
+        <div className="mx-3 mb-4 shrink-0 rounded-2xl border border-white/5 bg-white/5 p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs select-none shrink-0 border border-white/10`}>
+              {getInitials(user?.name || "")}
             </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-4 mb-5">
-                <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs shadow-2xl select-none shrink-0 border border-white/10`}>
-                  {getInitials(user?.name || "")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-black text-white truncate block tracking-tight">{user?.name}</span>
-                  <span className="text-[10px] text-slate-300 font-bold truncate block uppercase tracking-widest">{role === "admin" ? "Global Admin" : role}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className="flex-1 flex items-center justify-center py-2.5 text-slate-400 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 rounded-xl transition-all"
-                  title="Toggle Theme"
-                >
-                  {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
-                </button>
-                <button
-                  onClick={logout}
-                  className="flex-1 flex items-center justify-center py-2.5 text-slate-400 hover:text-rose-400 bg-white/5 border border-white/5 hover:border-rose-400/20 rounded-xl transition-all group"
-                  title="Sign Out"
-                >
-                  <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-                </button>
-              </div>
-            </>
-          )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-black text-white truncate">{user?.name}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest truncate">
+                {role === "admin" ? "Global Admin" : role}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsDarkMode(d => !d)}
+              className="flex-1 flex items-center justify-center py-2 rounded-xl text-slate-400 hover:text-white bg-white/5 border border-white/5 hover:border-white/10 transition-all"
+            >
+              {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
+            <button
+              onClick={logout}
+              className="flex-1 flex items-center justify-center py-2 rounded-xl text-slate-400 hover:text-rose-400 bg-white/5 border border-white/5 hover:border-rose-400/20 transition-all group"
+            >
+              <LogOut size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        <header className="h-20 flex items-center justify-between px-6 md:px-12 glass-panel sticky top-0 z-40 shadow-sm transition-colors duration-500">
-          <div className="min-w-0 animate-fade-in">
-            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-500 mb-1">{title}</div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tighter truncate">{subtitle}</h2>
+      {/* ── Desktop Sidebar ────────────────────────── */}
+      <aside
+        aria-label="Desktop navigation"
+        className={`
+          hidden lg:flex flex-col glass-sidebar shadow-2xl flex-shrink-0 relative z-30
+          transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+          ${isCollapsed ? "w-[5.5rem]" : "w-72"}
+        `}
+      >
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setIsCollapsed(c => !c)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-8 bg-indigo-600 border border-white/10 text-white rounded-full p-1.5 shadow-xl z-50 transition-all hover:scale-110 active:scale-95 hover:bg-indigo-500"
+        >
+          {isCollapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+
+        <SidebarContent {...sidebarProps} collapsed={isCollapsed} onNavigate={() => {}} />
+      </aside>
+
+      {/* ── Main Area ──────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* ── Top Header ───────────────────────────── */}
+        <header className="glass-panel h-16 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40 shrink-0">
+
+          {/* Left: hamburger (mobile) + page title */}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger — mobile only */}
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="lg:hidden p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all shrink-0"
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
+
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-500 leading-none mb-0.5 truncate">
+                {title}
+              </p>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight truncate leading-tight">
+                {subtitle}
+              </h2>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200/50 dark:border-white/5 text-slate-400 focus-within:text-indigo-500 focus-within:border-indigo-500/50 transition-all">
-              <Search size={16} />
-              <input type="text" placeholder="Search insights..." className="bg-transparent border-none outline-none text-xs font-bold w-48 text-slate-600 dark:text-slate-300 placeholder:text-slate-400" />
-            </div>
+          {/* Right: notification bell + avatar */}
+          <div className="flex items-center gap-3 shrink-0">
 
+            {/* Notifications */}
             <div className="relative">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className={`relative p-2.5 transition-all rounded-xl ${showNotifications ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600' : 'text-slate-400 hover:text-indigo-500'}`}
+                id="notifications-btn"
+                onClick={() => setShowNotifications(s => !s)}
+                aria-label="Notifications"
+                aria-expanded={showNotifications}
+                className={`relative p-2.5 rounded-xl transition-all
+                  ${showNotifications
+                    ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                    : "text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-white/5"
+                  }`}
               >
-                <Bell size={20} />
+                <Bell size={19} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-3.5 h-3.5 bg-rose-500 text-white text-[8px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 shadow-lg animate-bounce">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                  <span className="absolute top-1.5 right-1.5 w-3.5 h-3.5 bg-rose-500 text-white text-[7px] font-black flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 shadow-md">
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
 
+              {/* Notification panel */}
               {showNotifications && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  <div className="absolute right-0 mt-4 w-[380px] bg-white dark:bg-slate-900 rounded-[32px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-100 dark:border-white/5 z-50 overflow-hidden animate-in slide-in-from-top-2 duration-300">
-                    <div className="p-6 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-black uppercase tracking-widest dark:text-white">Notifications Center</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {["all", "new_chat", "new_ticket", "crm_follow_up_due", "sla_breach"].map((type) => (
-                            <button
-                              key={type}
-                              onClick={() => setNotificationFilter(type)}
-                              className={`rounded-xl px-3 py-1 text-[9px] font-black uppercase tracking-widest transition-all ${notificationFilter === type ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-500"
-                                }`}
-                            >
-                              {type === "all" ? "all" : type.replaceAll("_", " ")}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <button onClick={markAllRead} className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest hover:underline">
-                        Mark all as read
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} aria-hidden="true" />
+                  <div
+                    role="dialog"
+                    aria-label="Notifications"
+                    className="
+                      absolute right-0 mt-3 z-50
+                      w-[calc(100vw-2rem)] max-w-sm sm:w-[360px]
+                      bg-white dark:bg-slate-900
+                      rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]
+                      border border-slate-100 dark:border-white/5
+                      overflow-hidden animate-scale-in
+                    "
+                  >
+                    {/* Panel header */}
+                    <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
+                      <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-900 dark:text-white">
+                        Notifications
+                      </h4>
+                      <button
+                        onClick={markAllRead}
+                        className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      >
+                        Mark all read
                       </button>
                     </div>
 
-                    <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
-                      {notifications.length > 0 ? (
-                        notifications.map(n => (
-                          <div
-                            key={n._id}
-                            onClick={() => {
-                              markRead(n._id);
-                              if (n.link) window.location.href = n.link.startsWith("/") ? n.link : `/${n.link}`;
-                            }}
-                            className={`p-5 border-b border-slate-50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-all cursor-pointer relative ${!n.isRead ? 'bg-indigo-50/20 dark:bg-indigo-500/5' : ''}`}
-                          >
-                            {!n.isRead && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />}
-                            <div className="flex gap-4">
-                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${!n.isRead ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600' : 'bg-slate-100 dark:bg-white/10 text-slate-400'}`}>
-                                {n.type === 'new_chat' ? <MessageSquare size={16} /> : n.type === 'new_ticket' ? <Ticket size={16} /> : <AlertCircle size={16} />}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className={`text-[11px] font-black uppercase tracking-tight truncate ${n.isRead ? 'text-slate-500' : 'text-slate-900 dark:text-white'}`}>{n.title}</p>
-                                <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 line-clamp-2 mt-0.5">{n.message}</p>
-                                {(n.actorName || n.entityType) && (
-                                  <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-300">
-                                    {[n.actorName, n.entityType].filter(Boolean).join(" • ")}
-                                  </p>
+                    {/* Filter pills */}
+                    <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-slate-50 dark:border-white/5">
+                      {["all", "new_chat", "new_ticket", "crm_follow_up_due", "sla_breach"].map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setNotificationFilter(type)}
+                          className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all
+                            ${notificationFilter === type
+                              ? "bg-indigo-600 text-white"
+                              : "bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10"
+                            }`}
+                        >
+                          {type === "all" ? "All" : type.replaceAll("_", " ")}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Notification list */}
+                    <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                      {notifications.length > 0 ? notifications.map(n => (
+                        <div
+                          key={n._id}
+                          onClick={() => {
+                            markRead(n._id);
+                            if (n.link) window.location.href = n.link.startsWith("/") ? n.link : `/${n.link}`;
+                          }}
+                          className={`px-5 py-3.5 border-b border-slate-50 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-all relative ${!n.isRead ? "bg-indigo-50/30 dark:bg-indigo-500/5" : ""}`}
+                        >
+                          {!n.isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500" />}
+                          <div className="flex gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${!n.isRead ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600" : "bg-slate-100 dark:bg-white/10 text-slate-400"}`}>
+                              {n.type === "new_chat" ? <MessageSquare size={13} /> : n.type === "new_ticket" ? <Ticket size={13} /> : <AlertCircle size={13} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[11px] font-black truncate ${n.isRead ? "text-slate-500" : "text-slate-900 dark:text-white"}`}>
+                                {n.title}
+                              </p>
+                              <p className="text-[10px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">{n.message}</p>
+                              <div className="flex items-center justify-between mt-1.5">
+                                <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600">
+                                  {new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                                {n.link && (
+                                  <span className="text-[9px] font-bold text-indigo-400 flex items-center gap-1">
+                                    Go <ExternalLink size={8} />
+                                  </span>
                                 )}
-                                <div className="flex items-center justify-between mt-2">
-                                  <span className="text-[8px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest">{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                  {n.link && <button className="text-[8px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 hover:text-indigo-600">Sync <ExternalLink size={8} /></button>}
-                                </div>
                               </div>
                             </div>
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-20 text-center space-y-4">
-                          <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mx-auto">
-                            <Bell size={20} className="text-slate-200" />
+                        </div>
+                      )) : (
+                        <div className="py-12 text-center">
+                          <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-3">
+                            <Bell size={18} className="text-slate-300 dark:text-slate-600" />
                           </div>
-                          <p className="text-[10px] font-black text-slate-300 dark:text-slate-800 uppercase tracking-widest">Awaiting system signals...</p>
+                          <p className="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest">
+                            All caught up
+                          </p>
                         </div>
                       )}
                     </div>
@@ -347,18 +529,23 @@ export default function Layout({ title, subtitle, children, menuItems = [] }) {
               )}
             </div>
 
-            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs shadow-xl select-none cursor-pointer border-2 border-white dark:border-slate-800 transition-transform hover:scale-105 active:scale-95`}>
+            {/* Avatar */}
+            <div
+              className={`w-9 h-9 rounded-xl bg-gradient-to-br ${getAvatarColor(user?.name || "")} flex items-center justify-center text-white font-black text-xs select-none border-2 border-white dark:border-slate-800 shadow-md transition-transform hover:scale-105 active:scale-95 cursor-default`}
+              title={user?.name}
+            >
               {getInitials(user?.name || "")}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar scroll-smooth">
-          <div className="animate-fade-in max-w-7xl mx-auto">
+        {/* ── Page Content ─────────────────────────── */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto animate-fade-in">
             {children}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

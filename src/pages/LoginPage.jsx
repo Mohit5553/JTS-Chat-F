@@ -22,11 +22,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function submit(event) {
-    event.preventDefault();
+  async function submit(e) {
+    e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const user = mode === "login"
         ? await login(email, password, twoFactorCode)
@@ -34,10 +33,9 @@ export default function LoginPage() {
 
       if (user?.twoFactorRequired) {
         setNeedsTwoFactor(true);
-        setError("Enter your 6-digit authenticator code to finish signing in.");
+        setError("Enter your 6-digit authenticator code to continue.");
         return;
       }
-
       navigate(destinationForRole(user.role));
     } catch (err) {
       setError(err.message);
@@ -46,125 +44,110 @@ export default function LoginPage() {
     }
   }
 
+  const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#090e1a] overflow-hidden relative font-sans">
-      {/* Dynamic Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute -top-[20%] -left-[10%] w-[60%] h-[60%] bg-indigo-600/10 rounded-full blur-[120px] animate-pulse"></div>
-          <div className="absolute -bottom-[20%] -right-[10%] w-[60%] h-[60%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#090e1a] p-4 relative overflow-hidden">
+      {/* Background blobs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-1/4 -left-1/4 w-3/4 h-3/4 bg-indigo-600/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute -bottom-1/4 -right-1/4 w-3/4 h-3/4 bg-blue-600/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: "2s" }} />
       </div>
 
-      <form className="w-full max-w-[440px] bg-white rounded-[2.5rem] p-12 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] relative z-10 space-y-10 border border-white/20 animate-in fade-in zoom-in duration-700" onSubmit={submit}>
-        <div className="space-y-3 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] uppercase font-black tracking-[0.2em] leading-none mb-2 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm sm:max-w-[440px] bg-white rounded-3xl p-6 sm:p-10 shadow-[0_32px_80px_-16px_rgba(0,0,0,0.35)] relative z-10 space-y-6 border border-white/10"
+      >
+        {/* Header */}
+        <div className="space-y-2 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10px] uppercase font-black tracking-widest border border-emerald-500/20 mb-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             All Systems Operational
           </div>
-          <h1 className="text-4xl font-black text-slate-950 tracking-tighter leading-none">
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tighter leading-none">
             {mode === "login" ? "Welcome back." : "Create Account."}
           </h1>
-          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
+          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
             {mode === "login" ? "Access your operational dashboard" : "Initialize a new enterprise instance"}
           </p>
         </div>
 
-        <div className="p-1.5 bg-slate-50 rounded-2xl flex gap-1 border border-slate-100">
-          <button
-            type="button"
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${
-              mode === "login" ? "bg-white text-slate-950 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600"
-            }`}
-            onClick={() => setMode("login")}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${
-              mode === "register" ? "bg-white text-slate-950 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600"
-            }`}
-            onClick={() => setMode("register")}
-          >
-            Register
-          </button>
+        {/* Mode toggle */}
+        <div className="p-1 bg-slate-50 rounded-2xl flex gap-1 border border-slate-100">
+          {["login", "register"].map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200
+                ${mode === m ? "bg-white text-slate-900 shadow-sm border border-slate-100" : "text-slate-400 hover:text-slate-600"}`}
+            >
+              {m === "login" ? "Sign In" : "Register"}
+            </button>
+          ))}
         </div>
 
-        <div className="space-y-5">
+        {/* Fields */}
+        <div className="space-y-4">
           {mode === "register" && (
             <div className="space-y-1.5">
-               <label className="small-label">Identity Name</label>
-               <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Full Name"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                required
-                />
+              <label className="small-label">Full Name</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" className={inputClass} required />
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="small-label">Access Email</label>
-            <input
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="email@example.com"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                required
-            />
+            <label className="small-label">Email Address</label>
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="email@example.com" type="email" className={inputClass} required />
           </div>
           <div className="space-y-1.5">
-            <label className="small-label">Security Key</label>
-            <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="••••••••"
-                type="password"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                required
-            />
+            <label className="small-label">Password</label>
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" type="password" className={inputClass} required />
           </div>
           {mode === "login" && needsTwoFactor && (
             <div className="space-y-1.5">
               <label className="small-label">Authenticator Code</label>
               <input
                 value={twoFactorCode}
-                onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder="123456"
                 inputMode="numeric"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-xs font-bold tracking-[0.3em] focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+                className={`${inputClass} tracking-[0.3em] text-center`}
                 required
               />
             </div>
           )}
         </div>
 
+        {/* Error */}
         {error && (
-          <div className="bg-red-50 text-red-700 p-5 rounded-2xl text-[11px] font-black uppercase tracking-tight text-center border border-red-100 animate-in shake duration-500">
+          <div className="bg-red-50 text-red-700 px-4 py-3 rounded-xl text-[11px] font-bold text-center border border-red-100">
             {error}
           </div>
         )}
 
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-slate-950 hover:bg-black disabled:bg-slate-200 text-white font-black text-[10px] uppercase tracking-[0.25em] py-5 rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+          className="w-full bg-slate-950 hover:bg-indigo-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white font-black text-[11px] uppercase tracking-[0.2em] py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
           {loading ? (
-              <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-bounce"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-              </span>
-          ) : mode === "login" ? "Authenticate" : "Create Fleet"}
+            <span className="flex items-center gap-1.5">
+              {[0, 0.15, 0.3].map((d, i) => (
+                <span key={i} className="w-1.5 h-1.5 rounded-full bg-white/70 animate-bounce" style={{ animationDelay: `${d}s` }} />
+              ))}
+            </span>
+          ) : mode === "login" ? "Sign In" : "Create Account"}
         </button>
 
-        <div className="text-center space-y-2">
+        {mode === "login" && (
+          <div className="text-center">
             <button type="button" className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors underline-offset-2 hover:underline">
               Forgot your password?
             </button>
-        </div>
+          </div>
+        )}
       </form>
     </div>
   );
 }
-

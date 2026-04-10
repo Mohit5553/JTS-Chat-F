@@ -141,7 +141,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
          <div className="relative w-full max-w-6xl h-full max-h-[85vh] bg-white dark:bg-slate-900 rounded-[48px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden border border-slate-100 dark:border-white/5 transition-all animate-in zoom-in-95 duration-500">
 
             {/* Compact Header */}
-            <div className="px-10 py-6 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10 shrink-0">
+            <div className="px-6 md:px-10 py-5 md:py-6 border-b border-slate-50 dark:border-white/5 flex flex-wrap gap-4 items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10 shrink-0">
                <div className="flex items-center gap-5">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                      <Ticket size={24} />
@@ -170,13 +170,13 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
             </div>
 
             {/* Master Container: Two-Column Layout */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
 
                {/* Left Column: Intelligence & Logs (Scrollable) */}
-                     <div className="flex-[1.4] border-r border-slate-50 dark:border-white/5 overflow-y-auto custom-scrollbar bg-slate-50/20 dark:bg-black/10">
+                     <div className="lg:flex-[1.4] border-b lg:border-b-0 lg:border-r border-slate-50 dark:border-white/5 lg:overflow-y-auto custom-scrollbar bg-slate-50/20 dark:bg-black/10 shrink-0">
 
                   {/* Meta Grid */}
-                  <div className="p-10 grid grid-cols-2 gap-10">
+                  <div className="p-6 lg:p-10 grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-10">
                      <div className="space-y-1.5 p-6 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-white/5 shadow-sm">
                         <span className="small-label flex items-center gap-2">
                            <User size={12} className="text-indigo-400" /> Visitor Identity
@@ -195,7 +195,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
 
                   {/* Category & Subcategory Grid */}
                   {(ticket.category || ticket.subcategory) && (
-                     <div className="px-10 pb-10 grid grid-cols-2 gap-10">
+                     <div className="px-6 lg:px-10 pb-6 lg:pb-10 grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-10">
                         <div className="space-y-1.5 p-6 bg-indigo-50/30 dark:bg-indigo-500/5 rounded-3xl border border-indigo-100/50 dark:border-indigo-500/10 shadow-sm">
                            <span className="small-label flex items-center gap-2">
                               <Layers size={12} className="text-indigo-500" /> Primary Category
@@ -212,7 +212,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
                   )}
 
                   {/* SLA Metrics Grid */}
-                  <div className="px-10 pb-10 grid grid-cols-2 gap-10">
+                  <div className="px-6 lg:px-10 pb-6 lg:pb-10 grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-10">
                      <div className="p-6 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-3xl border border-emerald-100 dark:border-emerald-500/10">
                         <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-2 block">Initial Response SLA</span>
                         <div className="flex items-end gap-2">
@@ -230,7 +230,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
                   </div>
 
                   {/* Public Link Section */}
-                  <div className="px-10 pb-10">
+                  <div className="px-6 lg:px-10 pb-6 lg:pb-10">
                      <div className="p-8 bg-indigo-600 rounded-[32px] text-white shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-x-12 -translate-y-12 blur-2xl group-hover:scale-150 transition-transform duration-700" />
                         <div className="relative z-10 flex flex-col gap-5">
@@ -248,7 +248,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
                   </div>
 
                   {/* History Section */}
-                     <div className="px-10 pb-10 space-y-8">
+                     <div className="px-6 lg:px-10 pb-6 lg:pb-10 space-y-8">
                         <div className="flex items-center gap-4 px-2">
                            <History size={16} className="text-slate-400" />
                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">Operation Log</span>
@@ -258,9 +258,9 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
                </div>
 
                {/* Right Column: Configuration & Controls (Fixed-Style) */}
-               <div className="flex-1 flex flex-col bg-white dark:bg-slate-950">
+               <div className="lg:flex-1 flex flex-col bg-white dark:bg-slate-950 shrink-0">
 
-                  <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                  <div className="flex-1 lg:overflow-y-auto p-6 lg:p-10 space-y-10 custom-scrollbar">
 
                      {/* Status Selector */}
                      <div className="space-y-5">
@@ -389,7 +389,7 @@ function TicketDetailPanel({ ticket, onUpdate, onClose, assignableAgents = [], c
                   </div>
 
                   {/* Action Area: Large Button at bottom of right col */}
-                  <div className="p-10 border-t border-slate-50 dark:border-white/5 bg-slate-50/10 dark:bg-black/20 shrink-0">
+                  <div className="p-6 lg:p-10 border-t border-slate-50 dark:border-white/5 bg-slate-50/10 dark:bg-black/20 shrink-0">
                      <button
                         onClick={handleSave}
                         disabled={saving}
@@ -530,6 +530,7 @@ export default function TicketManager({ websiteId }) {
    );
 
    return (
+      <>
       <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
          {/* Header Area */}
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
@@ -868,6 +869,7 @@ export default function TicketManager({ websiteId }) {
                onPageChange={setPage}
             />
          )}
+      </div>
 
          {selectedTicket && (
             <TicketDetailPanel
@@ -878,6 +880,6 @@ export default function TicketManager({ websiteId }) {
                onClose={() => setSelectedTicket(null)}
             />
          )}
-      </div>
+      </>
    );
 }

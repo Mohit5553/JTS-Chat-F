@@ -39,7 +39,7 @@ export default function MockPaymentModal({ isOpen, onClose, plan, onStatusUpdate
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-300">
-      <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-white/10 overflow-hidden relative flex flex-col">
+      <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-white/10 overflow-hidden relative flex flex-col max-h-[90vh]">
 
         {/* Header - Fixed */}
         <div className="p-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between shrink-0">

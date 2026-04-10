@@ -357,7 +357,13 @@ export default function ClientManager() {
                 </div>
 
                 <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                   <button onClick={(e) => { e.stopPropagation(); /* TODO: handle delete */ }} className="p-3.5 text-slate-300 hover:text-red-500 bg-slate-50 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all shadow-sm">
+                   <button
+                      type="button"
+                      disabled
+                      title="Client deletion is not available from this screen yet."
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-3.5 text-slate-300 bg-slate-50 dark:bg-white/5 rounded-2xl transition-all shadow-sm cursor-not-allowed opacity-60"
+                   >
                       <Trash2 size={18} />
                    </button>
                 </div>

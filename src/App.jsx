@@ -4,8 +4,8 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ClientPage from "./pages/ClientPage.jsx";
 import AgentPage from "./pages/AgentPage.jsx";
 import TicketStatusPage from "./pages/TicketStatusPage.jsx";
-
 import ManagerPage from "./pages/ManagerPage.jsx";
+import SalesPage from "./pages/SalesPage.jsx";
 
 function destinationForRole(role) {
   if (["agent", "user"].includes(role)) return "/agent";
@@ -33,8 +33,6 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children;
 }
 
-// Ensure the new SalesPage is imported (I will create it next)
-import SalesPage from "./pages/SalesPage.jsx";
 
 export default function App() {
   const { user } = useAuth();

@@ -106,7 +106,7 @@ export default function ConversationHistory() {
       </div>
 
       {/* Deep Filter Bar */}
-      <form onSubmit={handleSearch} className="premium-card p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-100 dark:border-white/5">
+      <form onSubmit={handleSearch} className="premium-card p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-5 items-end bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-100 dark:border-white/5">
         <div className="space-y-2">
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Search Keywords</label>
           <div className="relative">
@@ -144,7 +144,7 @@ export default function ConversationHistory() {
           </select>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 col-span-1 md:col-span-2 xl:col-span-2">
           <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">Temporal Range</label>
           <div className="flex items-center gap-2">
             <input 

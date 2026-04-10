@@ -203,7 +203,7 @@ export default function CannedResponseManager() {
           <div className="relative flex min-h-full items-start justify-center py-6 sm:py-10">
           <form 
             onSubmit={handleCreate}
-            className="relative z-10 w-full max-w-xl space-y-8 rounded-[32px] border border-slate-100 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-500 dark:border-white/5 dark:bg-slate-900 sm:rounded-[40px] sm:p-8 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:p-10"
+            className="relative z-10 w-full max-w-xl space-y-8 rounded-[32px] border border-slate-100 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-500 dark:border-white/5 dark:bg-slate-900 sm:rounded-[40px] sm:p-8 max-h-[calc(100vh-2rem)] overflow-y-auto lg:max-h-[calc(100vh-5rem)] lg:p-10 custom-scrollbar"
           >
             <div className="flex justify-between items-start">
                <div className="space-y-3">

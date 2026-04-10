@@ -28,6 +28,10 @@ const DEFAULT_BUSINESS_HOURS = {
   sunday: { isOpen: false, open: "09:00", close: "17:00" }
 };
 
+function createDefaultBusinessHours() {
+  return JSON.parse(JSON.stringify(DEFAULT_BUSINESS_HOURS));
+}
+
 export default function WebsiteManager() {
   const [websites, setWebsites] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +49,7 @@ export default function WebsiteManager() {
     awayMessage: "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
     quickReplies: [],
     isActive: true,
-    businessHours: DEFAULT_BUSINESS_HOURS,
+    businessHours: createDefaultBusinessHours(),
     webhooks: []
   });
   const [customizingWebsite, setCustomizingWebsite] = useState(null);
@@ -89,7 +93,7 @@ export default function WebsiteManager() {
       awayMessage: "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
       quickReplies: [],
       isActive: true,
-      businessHours: DEFAULT_BUSINESS_HOURS,
+      businessHours: createDefaultBusinessHours(),
       webhooks: []
     });
   };
@@ -106,7 +110,7 @@ export default function WebsiteManager() {
       awayMessage: website.awayMessage || "Hello! We're currently offline, but if you leave a message, we'll get back to you shortly.",
       quickReplies: website.quickReplies || [],
       isActive: website.isActive !== false,
-      businessHours: website.businessHours || DEFAULT_BUSINESS_HOURS,
+      businessHours: website.businessHours || createDefaultBusinessHours(),
       webhooks: website.webhooks || []
     });
     setIsAdding(true);
@@ -578,7 +582,12 @@ export default function WebsiteManager() {
                 >
                   <Settings size={16} /> Configure
                 </button>
-                <button className="p-4.5 bg-red-50 dark:bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all shadow-sm border border-red-100 dark:border-red-500/10 hover:scale-105">
+                <button
+                  type="button"
+                  disabled
+                  title="Website deletion is not available from this screen yet."
+                  className="p-4.5 bg-red-50 dark:bg-red-500/5 text-red-400 rounded-2xl transition-all shadow-sm border border-red-100 dark:border-red-500/10 cursor-not-allowed opacity-60"
+                >
                   <Trash2 size={18} />
                 </button>
               </div>

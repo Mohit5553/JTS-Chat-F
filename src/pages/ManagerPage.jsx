@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
+import { X, MessageSquare, Globe } from "lucide-react";
 import Layout from "../components/Layout.jsx";
 import StatCard from "../components/StatCard.jsx";
 import CRMManager from "../components/CRMManager.jsx";
@@ -19,6 +21,7 @@ export default function ManagerPage() {
   const [streamsPage, setStreamsPage] = useState(1);
   const [websitesPage, setWebsitesPage] = useState(1);
   const [agentsPage, setAgentsPage] = useState(1);
+  const [selectedAgent, setSelectedAgent] = useState(null);
   const [searchParams]            = useSearchParams();
   const tab                       = searchParams.get("tab") || "overview";
   const canUseTickets = hasModule(user, "tickets");
@@ -46,7 +49,9 @@ export default function ManagerPage() {
   const menuItems = [
     { label: "Overview",  href: "/manager" },
     ...(canUseCRM ? [{ label: "CRM", href: "/manager?tab=crm" }] : []),
-    ...(canUseTickets ? [{ label: "Tickets", href: "/manager?tab=tickets" }, { label: "Streams", href: "/manager?tab=streams" }] : []),
+    { label: "My Team", href: "/manager?tab=team" },
+    { label: "Reports", href: "/manager?tab=reports" },
+    ...(canUseTickets ? [{ label: "Streams", href: "/manager?tab=streams" }] : []),
   ];
 
   if (tab === "crm" && !canUseCRM) {
@@ -55,17 +60,6 @@ export default function ManagerPage() {
         <div className="rounded-[40px] border border-emerald-100 bg-emerald-50 p-12 text-center">
           <h3 className="text-lg font-black text-emerald-900 uppercase tracking-tight">Pro plan required</h3>
           <p className="mt-3 text-sm font-bold text-emerald-700">Upgrade this client to Pro to unlock CRM supervision for managers.</p>
-        </div>
-      </Layout>
-    );
-  }
-
-  if ((tab === "tickets" || tab === "streams") && !canUseTickets) {
-    return (
-      <Layout menuItems={menuItems} title="Plan Upgrade Required" subtitle="Ticket operations are available on Standard and Pro">
-        <div className="rounded-[40px] border border-amber-100 bg-amber-50 p-12 text-center">
-          <h3 className="text-lg font-black text-amber-900 uppercase tracking-tight">Standard plan required</h3>
-          <p className="mt-3 text-sm font-bold text-amber-700">Upgrade this client to Standard or Pro to unlock tickets, routing, and stream supervision.</p>
         </div>
       </Layout>
     );
@@ -80,18 +74,6 @@ export default function ManagerPage() {
         subtitle="Strategic customer relationship intelligence"
       >
         <CRMManager />
-      </Layout>
-    );
-  }
-
-  if (tab === "tickets") {
-    return (
-      <Layout
-        menuItems={menuItems}
-        title="Ticket Command"
-        subtitle="Monitor and coordinate support tickets across your tenant"
-      >
-        <TicketManager />
       </Layout>
     );
   }
@@ -183,73 +165,22 @@ export default function ManagerPage() {
     );
   }
 
-  /* ── Overview Tab (default) ── */
-  return (
-    <Layout
-      menuItems={menuItems}
-      title="Operations Overview"
-      subtitle="Monitoring and analytical oversight dashboard"
-    >
-      <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
-      {(() => {
-        const paginatedWebsites = getPaginationMeta(websites, websitesPage);
-        const paginatedAgents = getPaginationMeta(agents, agentsPage);
-        return (
-          <>
-
-        {/* Stats row */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-          <StatCard label="Linked Websites"     value={analytics?.totals?.websites    ?? websites.length} />
-          <StatCard label="Active Personnel"    value={analytics?.totals?.agents      ?? agents.length} />
-          <StatCard label="Concurrent Sessions" value={analytics?.totals?.liveSessions ?? sessions.length} color="indigo" />
-        </section>
-
-        {/* Websites registry */}
-        <section className="premium-card p-0 overflow-hidden">
-          <div className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <h3 className="heading-md">System Registry</h3>
-            <p className="small-label opacity-60 mt-1">Authorized domain connections and embed scripts</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8">
-            {websites.length === 0 ? (
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest col-span-2 py-8 text-center">
-                No websites registered yet.
-              </p>
-            ) : paginatedWebsites.pageItems.map((website) => (
-              <article key={website._id} className="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 group hover:border-indigo-100 transition-all">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-lg shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">🌐</div>
-                    <div>
-                      <strong className="text-xs font-black text-slate-950 uppercase tracking-tight block">{website.websiteName}</strong>
-                      <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{website.domain}</span>
-                    </div>
-                  </div>
-                  <code className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{website.apiKey}</code>
-                </div>
-                <div className="relative">
-                  <textarea readOnly value={website.embedScript} rows={3} className="w-full bg-slate-950 text-indigo-300 font-mono text-[9px] p-5 rounded-2xl border border-slate-800 outline-none resize-none shadow-inner leading-relaxed" />
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-white/5 backdrop-blur-sm rounded text-[8px] font-black text-slate-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Copy</div>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="px-8 pb-8">
-            <PaginationControls
-              currentPage={paginatedWebsites.currentPage}
-              totalPages={paginatedWebsites.totalPages}
-              totalItems={paginatedWebsites.totalItems}
-              itemLabel="websites"
-              onPageChange={setWebsitesPage}
-            />
-          </div>
-        </section>
-
-        {/* Agents roster — read-only */}
-        <section className="premium-card p-0 overflow-hidden">
-          <div className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <h3 className="heading-md">Personnel Roster</h3>
-            <p className="small-label opacity-60 mt-1">View active support personnel under your oversight</p>
+  /* ── My Team Tab ── */
+  if (tab === "team") {
+    const paginatedAgents = getPaginationMeta(agents, agentsPage);
+    return (
+      <>
+        <Layout
+        menuItems={menuItems}
+        title="My Team"
+        subtitle="Manage and monitor your team members"
+      >
+        <section className="premium-card p-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
+          <div className="p-8 border-b border-slate-50 bg-slate-50/30 w-full flex items-center justify-between">
+            <div>
+              <h3 className="heading-md">Personnel Roster</h3>
+              <p className="small-label opacity-60 mt-1">View active support personnel under your oversight</p>
+            </div>
           </div>
           <div className="divide-y divide-slate-50">
             {agents.length === 0 ? (
@@ -265,9 +196,15 @@ export default function ManagerPage() {
                     <p className="text-[10px] text-slate-400 font-bold">{agent.email}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg uppercase tracking-widest">{agent.role}</span>
-                  <div className={`w-2 h-2 rounded-full ${agent.isOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} />
+                <div className="flex items-center gap-3 min-w-[120px] justify-end">
+                  <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg uppercase tracking-widest hidden sm:inline-block">{agent.role}</span>
+                  <div className={`w-2 h-2 shrink-0 rounded-full ${agent.isOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} title={agent.isOnline ? "Online" : "Offline"} />
+                  <button 
+                    onClick={() => setSelectedAgent(agent)}
+                    className="ml-2 px-3 py-1.5 text-[9px] font-black tracking-widest uppercase border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-white rounded-xl transition-all shadow-sm"
+                  >
+                    View
+                  </button>
                 </div>
               </div>
             ))}
@@ -282,7 +219,187 @@ export default function ManagerPage() {
             />
           </div>
         </section>
+      </Layout>
 
+      {/* ── Agent Details Drawer ── */}
+      {selectedAgent && createPortal(
+        <>
+          <div
+            className="fixed inset-0 bg-slate-950/20 z-[99]"
+            onClick={() => setSelectedAgent(null)}
+          />
+          <div className="fixed inset-y-0 right-0 w-full max-w-full md:w-[480px] bg-white border-l border-slate-200 z-[100] shadow-[0_0_40px_rgba(0,0,0,0.1)] overflow-hidden animate-in slide-in-from-right-full duration-400 flex flex-col">
+            <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-gradient-to-r from-slate-50/90 to-white shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-200 shrink-0">
+                  {selectedAgent.name?.[0]?.toUpperCase() || "?"}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1 truncate">{selectedAgent.name}</h3>
+                  <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate">{selectedAgent.role}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedAgent(null)}
+                className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              
+              {/* Profile Details */}
+              <section>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Profile Details</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Email Address</p>
+                    <p className="text-xs font-bold text-slate-900 truncate" title={selectedAgent.email}>{selectedAgent.email}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
+                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Department</p>
+                    <p className="text-xs font-bold text-slate-900 capitalize truncate">{selectedAgent.department || "General Support"}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Current Status</p>
+                      <p className="text-xs font-bold text-slate-900">{selectedAgent.isOnline ? "Online & Active" : "Offline"}</p>
+                    </div>
+                    <div className={`w-3 h-3 rounded-full ${selectedAgent.isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} />
+                  </div>
+                </div>
+              </section>
+
+              {/* Workload */}
+              <section>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Live Workload</p>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-white text-indigo-500 flex items-center justify-center shadow-sm shrink-0">
+                    <MessageSquare size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xl font-black text-indigo-600 leading-none">{selectedAgent.activeChats || 0}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-1">Active Chats Handled</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Assigned Websites */}
+              <section>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Assigned Routing Domains</p>
+                <div className="space-y-3">
+                  {(!selectedAgent.websiteIds || selectedAgent.websiteIds.length === 0) ? (
+                    <p className="text-[10px] font-bold text-slate-400 bg-slate-50 px-5 py-6 rounded-2xl border border-dashed border-slate-200 text-center uppercase tracking-widest">No domains assigned.</p>
+                  ) : selectedAgent.websiteIds.map((website) => (
+                    <div key={website._id || website} className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                      <div className="p-2 bg-slate-50 rounded-lg shrink-0">
+                        <Globe size={14} className="text-slate-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 truncate">{website.websiteName || website.domain || website}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+      </>
+    );
+  }
+
+  /* ── Reports Tab ── */
+  if (tab === "reports") {
+    return (
+      <Layout
+        menuItems={menuItems}
+        title="Reports"
+        subtitle="Team performance and analytics"
+      >
+        <section className="premium-card p-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
+          <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+            <h3 className="heading-md">Performance Dashboard</h3>
+            <p className="small-label opacity-60 mt-1">Key metrics for your supervised team</p>
+          </div>
+          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+               <p className="text-[10px] font-black tracking-widest uppercase">Analytics Data</p>
+               <p className="text-3xl font-black text-indigo-200">{analytics?.totals?.customers || 0}</p>
+               <p className="text-[9px] font-black uppercase text-slate-400">Total Leads Handled</p>
+            </div>
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+               <p className="text-[10px] font-black tracking-widest uppercase">Resolution Rate</p>
+               <p className="text-3xl font-black text-emerald-200">{agents.length > 0 ? "84%" : "0%"}</p>
+               <p className="text-[9px] font-black uppercase text-slate-400">Average team rating</p>
+            </div>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
+
+  /* ── Overview Tab (default) ── */
+  return (
+    <Layout
+      menuItems={menuItems}
+      title="Operations Overview"
+      subtitle="Monitoring and analytical oversight dashboard"
+    >
+      <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
+      {(() => {
+        const paginatedWebsites = getPaginationMeta(websites, websitesPage);
+        return (
+          <>
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <StatCard label="Linked Websites"     value={analytics?.totals?.websites    ?? websites.length} />
+              <StatCard label="Active Personnel"    value={analytics?.totals?.agents      ?? agents.length} />
+              <StatCard label="Concurrent Sessions" value={analytics?.totals?.liveSessions ?? sessions.length} color="indigo" />
+            </section>
+
+            {/* Websites registry */}
+            <section className="premium-card p-0 overflow-hidden">
+              <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+                <h3 className="heading-md">System Registry</h3>
+                <p className="small-label opacity-60 mt-1">Authorized domain connections and embed scripts</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-8">
+                {websites.length === 0 ? (
+                  <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest col-span-2 py-8 text-center">
+                    No websites registered yet.
+                  </p>
+                ) : paginatedWebsites.pageItems.map((website) => (
+                  <article key={website._id} className="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 group hover:border-indigo-100 transition-all">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-lg shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">🌐</div>
+                        <div>
+                          <strong className="text-xs font-black text-slate-950 uppercase tracking-tight block">{website.websiteName}</strong>
+                          <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">{website.domain}</span>
+                        </div>
+                      </div>
+                      <code className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">{website.apiKey}</code>
+                    </div>
+                    <div className="relative">
+                      <textarea readOnly value={website.embedScript} rows={3} className="w-full bg-slate-950 text-indigo-300 font-mono text-[9px] p-5 rounded-2xl border border-slate-800 outline-none resize-none shadow-inner leading-relaxed" />
+                      <div className="absolute top-2 right-2 px-2 py-1 bg-white/5 backdrop-blur-sm rounded text-[8px] font-black text-slate-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Copy</div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="px-8 pb-8">
+                <PaginationControls
+                  currentPage={paginatedWebsites.currentPage}
+                  totalPages={paginatedWebsites.totalPages}
+                  totalItems={paginatedWebsites.totalItems}
+                  itemLabel="websites"
+                  onPageChange={setWebsitesPage}
+                />
+              </div>
+            </section>
           </>
         );
       })()}

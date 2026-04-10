@@ -128,7 +128,7 @@ export default function AdminSubscriptionManager() {
       {/* Details Modal */}
       {selectedClient && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="w-full max-w-[420px] bg-white dark:bg-slate-900 rounded-[32px] border border-white/10 shadow-2xl overflow-hidden relative">
+           <div className="w-full max-w-[420px] bg-white dark:bg-slate-900 rounded-[32px] border border-white/10 shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]">
               
               {/* Header */}
               <div className="px-8 py-6 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
@@ -142,7 +142,7 @@ export default function AdminSubscriptionManager() {
               </div>
 
               {/* Identity Section */}
-              <div className="p-8 space-y-8">
+              <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
                  <div className="flex items-center gap-6">
                     <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-xl font-black text-white shadow-xl shadow-indigo-500/20">
                        {selectedClient.name.charAt(0)}

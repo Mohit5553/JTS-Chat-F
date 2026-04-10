@@ -56,8 +56,8 @@ export default function TicketConversionModal({ session, onClose, onSuccess }) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" onClick={onClose} />
       
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[40px] shadow-2xl border border-slate-100 dark:border-white/5 overflow-hidden animate-in zoom-in-95 duration-300">
-        <div className="px-10 py-8 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-[32px] md:rounded-[40px] shadow-2xl border border-slate-100 dark:border-white/5 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="px-6 md:px-10 py-5 md:py-8 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm shrink-0">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
               <Ticket size={24} />
@@ -72,7 +72,7 @@ export default function TicketConversionModal({ session, onClose, onSuccess }) {
           </button>
         </div>
 
-        <div className="p-10 space-y-8">
+        <div className="p-6 md:p-10 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar flex-1">
            {error && (
              <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-[11px] font-black uppercase tracking-widest rounded-2xl animate-in shake duration-500">
                {error}
@@ -122,7 +122,7 @@ export default function TicketConversionModal({ session, onClose, onSuccess }) {
            </div>
         </div>
 
-        <div className="px-10 pb-10">
+        <div className="px-6 md:px-10 pb-6 md:pb-10 pt-4 shrink-0">
           <button
             onClick={handleConvert}
             disabled={saving}

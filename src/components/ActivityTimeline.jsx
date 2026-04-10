@@ -16,6 +16,82 @@ const TYPE_STYLES = {
   status_changed: "bg-blue-500"
 };
 
+function formatMetadataValue(value) {
+  if (value === null || value === undefined || value === "") return "empty";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object") {
+    if (Array.isArray(value)) return `[ ${value.length} items ]`;
+    return "{ complex data }";
+  }
+  return String(value);
+}
+
+function renderMetadata(metadata) {
+  if (!metadata || Object.keys(metadata).length === 0) return null;
+
+  // Handle standard before/after updates with visual diffs
+  if (metadata.before && metadata.after) {
+    const changes = [];
+    Object.keys(metadata.after).forEach(key => {
+      const beforeStr = JSON.stringify(metadata.before[key]);
+      const afterStr = JSON.stringify(metadata.after[key]);
+      if (beforeStr !== afterStr) {
+        changes.push({
+          field: key,
+          from: formatMetadataValue(metadata.before[key]),
+          to: formatMetadataValue(metadata.after[key])
+        });
+      }
+    });
+
+    if (changes.length > 0) {
+      return (
+        <div className="mt-4 space-y-2">
+          {changes.map(change => (
+            <div key={change.field} className="flex flex-wrap items-center gap-2 md:gap-3 text-[10px]">
+              <span className="font-black uppercase tracking-widest text-slate-400 w-full md:w-[120px] shrink-0">
+                {change.field.replace(/[A-Z]/g, letter => ` ${letter}`).trim()}
+              </span>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="px-2 border border-rose-100 py-1 rounded bg-rose-50 text-rose-600 line-through min-w-0 truncate max-w-[130px]">
+                  {change.from}
+                </span>
+                <span className="text-slate-300">→</span>
+                <span className="px-2 border border-emerald-100 py-1 rounded bg-emerald-50 text-emerald-700 font-bold min-w-0 truncate max-w-[130px]">
+                  {change.to}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  }
+
+  // Handle other generic metadata as nice parameter chips
+  const displayKeys = Object.keys(metadata).filter(k => 
+    typeof metadata[k] !== 'object' || Array.isArray(metadata[k])
+  );
+  
+  if (displayKeys.length === 0) return null;
+
+  return (
+    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {displayKeys.map((key) => (
+        <div key={key} className="flex flex-col bg-slate-50 px-3 py-2 rounded-xl border border-slate-100">
+          <span className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+            {key.replace(/[A-Z]/g, letter => ` ${letter}`).trim()}
+          </span>
+          <span className="text-[10px] font-bold text-slate-700 truncate mt-0.5">
+            {formatMetadataValue(metadata[key])}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ActivityTimeline({ items = [], emptyLabel = "No timeline activity yet." }) {
   if (!items.length) {
     return (
@@ -42,11 +118,7 @@ export default function ActivityTimeline({ items = [], emptyLabel = "No timeline
                 {new Date(item.createdAt).toLocaleString()}
               </span>
             </div>
-            {item.metadata && Object.keys(item.metadata).length > 0 ? (
-              <pre className="mt-3 overflow-x-auto rounded-xl bg-slate-50 px-3 py-2 text-[10px] font-medium text-slate-500">
-                {JSON.stringify(item.metadata, null, 2)}
-              </pre>
-            ) : null}
+            {item.metadata ? renderMetadata(item.metadata) : null}
           </div>
         </div>
       ))}

@@ -3,12 +3,15 @@ import { CreditCard, Zap, Shield, Crown, AlertTriangle, ExternalLink, ArrowUpRig
 import { api } from "../api/client.js";
 import PricingPage from "./PricingPage.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 export default function BillingPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [billingPeriod, setBillingPeriod] = useState("monthly"); // "monthly" | "annual"
 
   const fetchStatus = async () => {
     try {
@@ -30,7 +33,7 @@ export default function BillingPage() {
       const { url } = await api("/api/billing/portal", { method: "POST" });
       window.location.href = url;
     } catch (err) {
-      alert("Portal Error: " + err.message);
+      toast.error("Could not open billing portal: " + err.message);
     }
   };
 
@@ -138,11 +141,25 @@ export default function BillingPage() {
                <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Scalable intelligence for your support ecosystem.</p>
             </div>
             <div className="flex gap-4">
-               <button className="px-4 py-2 border-2 border-slate-100 dark:border-white/5 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-400 hover:border-indigo-500 hover:text-indigo-500 transition-all">Monthly</button>
-               <button className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-xl">Annual -20%</button>
+               <button
+                 onClick={() => setBillingPeriod("monthly")}
+                 className={`px-4 py-2 border-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                   billingPeriod === "monthly"
+                     ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10"
+                     : "border-slate-100 dark:border-white/5 text-slate-400 hover:border-indigo-400 hover:text-indigo-500"
+                 }`}
+               >Monthly</button>
+               <button
+                 onClick={() => setBillingPeriod("annual")}
+                 className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-xl transition-all ${
+                   billingPeriod === "annual"
+                     ? "bg-indigo-600 text-white shadow-indigo-200"
+                     : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-indigo-700"
+                 }`}
+               >Annual -20%</button>
             </div>
          </div>
-         <PricingPage currentPlan={data?.subscription?.plan} isExpired={isExpired} />
+         <PricingPage currentPlan={data?.subscription?.plan} isExpired={isExpired} billingPeriod={billingPeriod} />
       </section>
     </div>
   );

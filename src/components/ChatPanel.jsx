@@ -24,10 +24,10 @@ const linkify = (text = "") => {
   return text.split(urlRegex).map((part, i) => {
     if (part.match(urlRegex)) {
       return (
-        <a 
-          key={i} 
-          href={part} 
-          target="_blank" 
+        <a
+          key={i}
+          href={part}
+          target="_blank"
           rel="noopener noreferrer"
           className="underline decoration-indigo-400/50 hover:decoration-indigo-400 transition-all font-bold"
           onClick={(e) => e.stopPropagation()}
@@ -57,7 +57,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
 
   useEffect(() => {
     if (!disabled && canUseShortcuts) {
-      api("/api/canned-responses").then(setShortcuts).catch(() => {});
+      api("/api/canned-responses").then(setShortcuts).catch(() => { });
     }
   }, [disabled, canUseShortcuts]);
 
@@ -101,7 +101,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     setShowShortcuts(false);
     setShortcutQuery("");
   }
-  
+
   async function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -119,7 +119,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
         },
         body: formData
       });
-      
+
       const text = await res.text();
       let data;
       try {
@@ -128,7 +128,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
         throw new Error("Server returned non-JSON response");
       }
       if (!res.ok) throw new Error(data.message || "Upload failed");
-      
+
       onSend({ text: draft || "Sent an attachment", attachmentUrl: data.url, attachmentType: data.attachmentType });
       setDraft("");
     } catch (err) {
@@ -146,11 +146,11 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     setShortcutQuery("");
   };
 
-  const filteredShortcuts = shortcutQuery 
-    ? shortcuts.filter(s => 
-        s.shortcut.toLowerCase().includes(shortcutQuery.toLowerCase()) || 
-        s.content.toLowerCase().includes(shortcutQuery.toLowerCase())
-      )
+  const filteredShortcuts = shortcutQuery
+    ? shortcuts.filter(s =>
+      s.shortcut.toLowerCase().includes(shortcutQuery.toLowerCase()) ||
+      s.content.toLowerCase().includes(shortcutQuery.toLowerCase())
+    )
     : shortcuts;
 
   const visitor = session.visitorId;
@@ -163,16 +163,16 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     const diff = Math.floor((new Date() - new Date(visitor.lastVisitTime)) / 60000);
     if (diff < 1) return "Last active: Just now";
     if (diff < 60) return `Last active: ${diff}m ago`;
-    return `Last active: ${Math.floor(diff/60)}h ago`;
+    return `Last active: ${Math.floor(diff / 60)}h ago`;
   };
 
   return (
     <section className="bg-white dark:bg-slate-900/90 flex flex-col h-[700px] rounded-3xl border border-slate-100 dark:border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden relative animate-in fade-in slide-in-from-bottom-2 duration-500 transition-colors duration-500">
 
       {/* ── Header with Premium Visitor Intel ── */}
-      <div className="px-8 py-5 border-b border-slate-50 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl shrink-0 sticky top-0 z-10 transition-colors">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
+      <div className="px-5 md:px-8 py-4 md:py-5 border-b border-slate-50 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl shrink-0 sticky top-0 z-10 transition-colors">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 lg:gap-4 flex-[1_1_min(100%,400px)] lg:flex-1">
             <div className={`w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center text-white font-black text-sm shadow-xl shadow-indigo-100 ring-4 ring-white dark:ring-slate-800 select-none`}>
               {getInitials(visitorName)}
             </div>
@@ -180,8 +180,8 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
               <div className="flex items-center gap-2 mb-0.5">
                 <h3 className="text-sm font-black text-slate-900 dark:text-white truncate tracking-tight">{visitorName}</h3>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 dark:bg-white/5 rounded-lg border border-slate-100 dark:border-white/5">
-                   <span className={`w-1.5 h-1.5 rounded-full ${visitor?.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'} shrink-0`} />
-                   <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{getRelativeStatus()}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${visitor?.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'} shrink-0`} />
+                  <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{getRelativeStatus()}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
@@ -207,7 +207,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
             </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-4 p-3 bg-slate-50/70 dark:bg-white/5 border border-slate-100/50 dark:border-white/5 rounded-2xl">
+          <div className="hidden 2xl:flex items-center gap-4 p-3 bg-slate-50/70 dark:bg-white/5 border border-slate-100/50 dark:border-white/5 rounded-2xl shrink-0">
             <div className="flex flex-col items-end">
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">IP Tracking</span>
               <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 font-mono tracking-tighter">{visitor?.ipAddress || "0.0.0.0"}</span>
@@ -219,22 +219,21 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0 w-full sm:w-auto">
             {onConvertToTicket ? (
               <button
-                 onClick={() => onConvertToTicket(session)}
-                 className="p-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl flex items-center gap-2 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm group"
-                 title="Convert to Ticket"
+                onClick={() => onConvertToTicket(session)}
+                className="p-3 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl flex items-center gap-2 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all shadow-sm group"
+                title="Convert to Ticket"
               >
-                 <Ticket size={18} className="group-hover:rotate-12 transition-transform" />
-                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Convert to Ticket</span>
+                <Ticket size={18} className="group-hover:rotate-12 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Convert to Ticket</span>
               </button>
             ) : null}
-            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm border ${
-              session.status === "queued"
+            <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm border ${session.status === "queued"
                 ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20"
                 : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20"
-            }`}>
+              }`}>
               {session.status}
             </span>
           </div>
@@ -242,20 +241,19 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
       </div>
 
       {/* ── Messages Zone ── */}
-      <div 
+      <div
         ref={viewportRef}
-        className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]" 
+        className="flex-1 overflow-y-auto p-8 space-y-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]"
       >
         {messages.map((msg, i) => {
           const isMe = msg.sender === "agent";
           return (
             <div key={msg._id || i} className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
               <div className={`max-w-[80%] group flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium shadow-sm transition-all hover:shadow-md ${
-                  isMe 
-                    ? "bg-slate-900 dark:bg-indigo-600 text-white rounded-tr-none" 
+                <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium shadow-sm transition-all hover:shadow-md ${isMe
+                    ? "bg-slate-900 dark:bg-indigo-600 text-white rounded-tr-none"
                     : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-white/5 rounded-tl-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
-                }`}>
+                  }`}>
                   {msg.attachmentUrl ? (
                     <div className="space-y-3">
                       {msg.attachmentType === "image" ? (
@@ -279,11 +277,11 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
                   {isMe && (
                     <div className="flex items-center gap-0.5">
                       {msg.readAt ? (
-                         <CheckCheck size={10} className="text-indigo-500" />
+                        <CheckCheck size={10} className="text-indigo-500" />
                       ) : msg.deliveredAt ? (
-                         <CheckCheck size={10} className="text-slate-300 dark:text-slate-600" />
+                        <CheckCheck size={10} className="text-slate-300 dark:text-slate-600" />
                       ) : (
-                         <Check size={10} className="text-slate-300 dark:text-slate-600" />
+                        <Check size={10} className="text-slate-300 dark:text-slate-600" />
                       )}
                     </div>
                   )}
@@ -308,39 +306,39 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
       {/* ── Input Zone ── */}
       {!disabled && (
         <div className="p-6 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-white/5 relative shadow-[0_-10px_30px_rgba(0,0,0,0.02)] transition-colors">
-        {showShortcuts && (
-          <div className="absolute bottom-full left-6 right-6 mb-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500 z-50">
-            <div className="p-4 bg-slate-50/50 dark:bg-black/10 border-b border-slate-50 dark:border-white/5">
-              <input
-                autoFocus
-                className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all dark:text-white"
-                placeholder="Search canned replies (use / to trigger)..."
-                value={shortcutQuery}
-                onChange={(e) => setShortcutQuery(e.target.value)}
-              />
+          {showShortcuts && (
+            <div className="absolute bottom-full left-6 right-6 mb-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500 z-50">
+              <div className="p-4 bg-slate-50/50 dark:bg-black/10 border-b border-slate-50 dark:border-white/5">
+                <input
+                  autoFocus
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all dark:text-white"
+                  placeholder="Search canned replies (use / to trigger)..."
+                  value={shortcutQuery}
+                  onChange={(e) => setShortcutQuery(e.target.value)}
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto p-2">
+                {filteredShortcuts.map((s) => (
+                  <button
+                    key={s._id}
+                    onClick={() => handleShortcutClick(s.content)}
+                    className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl group transition-all"
+                  >
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 uppercase tracking-widest leading-none">/{s.shortcut}</span>
+                      <span className="text-[10px] font-black text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-widest leading-none">Shortcut</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{s.content}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="max-h-60 overflow-y-auto p-2">
-              {filteredShortcuts.map((s) => (
-                <button
-                  key={s._id}
-                  onClick={() => handleShortcutClick(s.content)}
-                  className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-white/5 rounded-2xl group transition-all"
-                >
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 uppercase tracking-widest leading-none">/{s.shortcut}</span>
-                    <span className="text-[10px] font-black text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-widest leading-none">Shortcut</span>
-                  </div>
-                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{s.content}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
 
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <div className="relative group">
-            <textarea
-              className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-50 dark:border-white/5 rounded-3xl px-6 py-4 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500/50 outline-none transition-all resize-none shadow-inner min-h-[80px] dark:text-white"
+          <form onSubmit={submit} className="flex flex-col gap-4">
+            <div className="relative group">
+              <textarea
+                className="w-full bg-slate-50 dark:bg-white/5 border-2 border-slate-50 dark:border-white/5 rounded-3xl px-6 py-4 text-sm font-medium focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500/50 outline-none transition-all resize-none shadow-inner min-h-[80px] dark:text-white"
                 placeholder={
                   disabled
                     ? "Session is read-only..."
@@ -363,16 +361,16 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
                     setShortcutQuery(val.substring(1));
                   }
                 }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  submit(e);
-                }
-              }}
-            />
-            
-            <div className="absolute right-4 bottom-4 flex items-center gap-2">
-               <button
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submit(e);
+                  }
+                }}
+              />
+
+              <div className="absolute right-4 bottom-4 flex items-center gap-2">
+                <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-white/10 rounded-2xl transition-all"
@@ -387,11 +385,11 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
                 >
                   <Send size={18} />
                 </button>
+              </div>
             </div>
-          </div>
-          
-          <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-        </form>
+
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+          </form>
         </div>
       )}
     </section>

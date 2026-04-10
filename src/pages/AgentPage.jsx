@@ -656,7 +656,7 @@ export default function AgentPage() {
       {ticketModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
           <div className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => { setTicketModal(false); setTicketResult(null); }} />
-          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 overflow-hidden">
             <div className="p-8 border-b border-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
@@ -700,7 +700,7 @@ export default function AgentPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={generateTicket} className="p-8 space-y-6">
+              <form onSubmit={generateTicket} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pipeline Category</label>
