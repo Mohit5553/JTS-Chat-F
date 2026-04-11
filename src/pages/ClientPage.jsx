@@ -152,7 +152,7 @@ const ClientOverview = ({ analytics, queuedSessions, isExpired, stripeCustomerId
       title: "CRM Track",
       subtitle: "Manage the lead or customer relationship",
       accent: "from-emerald-500 to-teal-500",
-      points: ["Sales updates prospect, lead, customer, inactive", "CRM keeps notes, chats, and ticket history", "Agent can view CRM but not change it"]
+      points: ["Sales moves leads from new to contacted, qualified, proposal, negotiation, won or lost", "CRM keeps notes, chats, and ticket history", "Agent can view linked CRM context but cannot manage pipeline"]
     },
     {
       title: "Leadership Review",
@@ -605,7 +605,6 @@ export default function ClientPage() {
     </Layout>
   );
 }
-
 
 
 

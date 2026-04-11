@@ -39,7 +39,8 @@ export const SALES_ALLOWED_STATUS_TRANSITIONS = Object.freeze({
   new: ["new", "contacted"],
   contacted: ["contacted", "qualified"],
   qualified: ["qualified", "proposal_sent"],
-  proposal_sent: ["proposal_sent"],
+  proposal_sent: ["proposal_sent", "negotiation"],
+  negotiation: ["negotiation"],
   // legacy
   prospect: ["prospect", "lead"],
   lead: ["lead", "customer"],

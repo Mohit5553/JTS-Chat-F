@@ -26,6 +26,7 @@ export default function ManagerPage() {
   const tab                       = searchParams.get("tab") || "overview";
   const canUseTickets = hasModule(user, "tickets");
   const canUseCRM = hasModule(user, "crm");
+  const canUseReports = hasModule(user, "reports");
 
   async function load() {
     try {
@@ -50,7 +51,7 @@ export default function ManagerPage() {
     { label: "Overview",  href: "/manager" },
     ...(canUseCRM ? [{ label: "CRM", href: "/manager?tab=crm" }] : []),
     { label: "My Team", href: "/manager?tab=team" },
-    { label: "Reports", href: "/manager?tab=reports" },
+    ...(canUseReports ? [{ label: "Reports", href: "/manager?tab=reports" }] : []),
     ...(canUseTickets ? [{ label: "Streams", href: "/manager?tab=streams" }] : []),
   ];
 
@@ -171,149 +172,159 @@ export default function ManagerPage() {
     return (
       <>
         <Layout
-        menuItems={menuItems}
-        title="My Team"
-        subtitle="Manage and monitor your team members"
-      >
-        <section className="premium-card p-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
-          <div className="p-8 border-b border-slate-50 bg-slate-50/30 w-full flex items-center justify-between">
-            <div>
-              <h3 className="heading-md">Personnel Roster</h3>
-              <p className="small-label opacity-60 mt-1">View active support personnel under your oversight</p>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-50">
-            {agents.length === 0 ? (
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest py-10 text-center">No personnel assigned yet.</p>
-            ) : paginatedAgents.pageItems.map((agent) => (
-              <div key={agent._id} className="flex items-center justify-between px-8 py-5 hover:bg-slate-50/50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-indigo-200">
-                    {agent.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{agent.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold">{agent.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 min-w-[120px] justify-end">
-                  <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg uppercase tracking-widest hidden sm:inline-block">{agent.role}</span>
-                  <div className={`w-2 h-2 shrink-0 rounded-full ${agent.isOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} title={agent.isOnline ? "Online" : "Offline"} />
-                  <button 
-                    onClick={() => setSelectedAgent(agent)}
-                    className="ml-2 px-3 py-1.5 text-[9px] font-black tracking-widest uppercase border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-white rounded-xl transition-all shadow-sm"
-                  >
-                    View
-                  </button>
-                </div>
+          menuItems={menuItems}
+          title="My Team"
+          subtitle="Manage and monitor your team members"
+        >
+          <section className="premium-card p-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
+            <div className="p-8 border-b border-slate-50 bg-slate-50/30 w-full flex items-center justify-between">
+              <div>
+                <h3 className="heading-md">Personnel Roster</h3>
+                <p className="small-label opacity-60 mt-1">View active support personnel under your oversight</p>
               </div>
-            ))}
-          </div>
-          <div className="px-8 pb-8">
-            <PaginationControls
-              currentPage={paginatedAgents.currentPage}
-              totalPages={paginatedAgents.totalPages}
-              totalItems={paginatedAgents.totalItems}
-              itemLabel="personnel"
-              onPageChange={setAgentsPage}
-            />
-          </div>
-        </section>
-      </Layout>
-
-      {/* ── Agent Details Drawer ── */}
-      {selectedAgent && createPortal(
-        <>
-          <div
-            className="fixed inset-0 bg-slate-950/20 z-[99]"
-            onClick={() => setSelectedAgent(null)}
-          />
-          <div className="fixed inset-y-0 right-0 w-full max-w-full md:w-[480px] bg-white border-l border-slate-200 z-[100] shadow-[0_0_40px_rgba(0,0,0,0.1)] overflow-hidden animate-in slide-in-from-right-full duration-400 flex flex-col">
-            <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-gradient-to-r from-slate-50/90 to-white shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-200 shrink-0">
-                  {selectedAgent.name?.[0]?.toUpperCase() || "?"}
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1 truncate">{selectedAgent.name}</h3>
-                  <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate">{selectedAgent.role}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedAgent(null)}
-                className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all shrink-0"
-              >
-                <X size={20} />
-              </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              
-              {/* Profile Details */}
-              <section>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Profile Details</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Email Address</p>
-                    <p className="text-xs font-bold text-slate-900 truncate" title={selectedAgent.email}>{selectedAgent.email}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Department</p>
-                    <p className="text-xs font-bold text-slate-900 capitalize truncate">{selectedAgent.department || "General Support"}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 flex items-center justify-between">
+            <div className="divide-y divide-slate-50">
+              {agents.length === 0 ? (
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest py-10 text-center">No personnel assigned yet.</p>
+              ) : paginatedAgents.pageItems.map((agent) => (
+                <div key={agent._id} className="flex items-center justify-between px-8 py-5 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center font-black text-sm shadow-lg shadow-indigo-200">
+                      {agent.name?.[0]?.toUpperCase()}
+                    </div>
                     <div>
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Current Status</p>
-                      <p className="text-xs font-bold text-slate-900">{selectedAgent.isOnline ? "Online & Active" : "Offline"}</p>
+                      <p className="text-xs font-black text-slate-900 uppercase tracking-tight">{agent.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold">{agent.email}</p>
                     </div>
-                    <div className={`w-3 h-3 rounded-full ${selectedAgent.isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} />
+                  </div>
+                  <div className="flex items-center gap-3 min-w-[120px] justify-end">
+                    <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg uppercase tracking-widest hidden sm:inline-block">{agent.role}</span>
+                    <div className={`w-2 h-2 shrink-0 rounded-full ${agent.isOnline ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} title={agent.isOnline ? "Online" : "Offline"} />
+                    <button
+                      onClick={() => setSelectedAgent(agent)}
+                      className="ml-2 px-3 py-1.5 text-[9px] font-black tracking-widest uppercase border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-white rounded-xl transition-all shadow-sm"
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
-              </section>
-
-              {/* Workload */}
-              <section>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Live Workload</p>
-                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white text-indigo-500 flex items-center justify-center shadow-sm shrink-0">
-                    <MessageSquare size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xl font-black text-indigo-600 leading-none">{selectedAgent.activeChats || 0}</p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-1">Active Chats Handled</p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Assigned Websites */}
-              <section>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Assigned Routing Domains</p>
-                <div className="space-y-3">
-                  {(!selectedAgent.websiteIds || selectedAgent.websiteIds.length === 0) ? (
-                    <p className="text-[10px] font-bold text-slate-400 bg-slate-50 px-5 py-6 rounded-2xl border border-dashed border-slate-200 text-center uppercase tracking-widest">No domains assigned.</p>
-                  ) : selectedAgent.websiteIds.map((website) => (
-                    <div key={website._id || website} className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                      <div className="p-2 bg-slate-50 rounded-lg shrink-0">
-                        <Globe size={14} className="text-slate-400" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">{website.websiteName || website.domain || website}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
+              ))}
             </div>
-          </div>
-        </>,
-        document.body
-      )}
+            <div className="px-8 pb-8">
+              <PaginationControls
+                currentPage={paginatedAgents.currentPage}
+                totalPages={paginatedAgents.totalPages}
+                totalItems={paginatedAgents.totalItems}
+                itemLabel="personnel"
+                onPageChange={setAgentsPage}
+              />
+            </div>
+          </section>
+        </Layout>
+
+        {/* ── Agent Details Drawer ── */}
+        {selectedAgent && createPortal(
+          <>
+            <div
+              className="fixed inset-0 bg-slate-950/20 z-[99]"
+              onClick={() => setSelectedAgent(null)}
+            />
+            <div className="fixed inset-y-0 right-0 w-full max-w-full md:w-[480px] bg-white border-l border-slate-200 z-[100] shadow-[0_0_40px_rgba(0,0,0,0.1)] overflow-hidden animate-in slide-in-from-right-full duration-400 flex flex-col">
+              <div className="px-6 py-5 border-b border-slate-100 flex items-start justify-between bg-gradient-to-r from-slate-50/90 to-white shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-200 shrink-0">
+                    {selectedAgent.name?.[0]?.toUpperCase() || "?"}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-black text-slate-900 tracking-tight leading-none mb-1 truncate">{selectedAgent.name}</h3>
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest truncate">{selectedAgent.role}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAgent(null)}
+                  className="p-2 text-slate-300 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all shrink-0"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+                {/* Profile Details */}
+                <section>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Profile Details</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Email Address</p>
+                      <p className="text-xs font-bold text-slate-900 truncate" title={selectedAgent.email}>{selectedAgent.email}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 sm:col-span-1">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">Department</p>
+                      <p className="text-xs font-bold text-slate-900 capitalize truncate">{selectedAgent.department || "General Support"}</p>
+                    </div>
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 col-span-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Current Status</p>
+                        <p className="text-xs font-bold text-slate-900">{selectedAgent.isOnline ? "Online & Active" : "Offline"}</p>
+                      </div>
+                      <div className={`w-3 h-3 rounded-full ${selectedAgent.isOnline ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-300"}`} />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Workload */}
+                <section>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Live Workload</p>
+                  <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-white text-indigo-500 flex items-center justify-center shadow-sm shrink-0">
+                      <MessageSquare size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xl font-black text-indigo-600 leading-none">{selectedAgent.activeChats || 0}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mt-1">Active Chats Handled</p>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Assigned Websites */}
+                <section>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">🔹 Assigned Routing Domains</p>
+                  <div className="space-y-3">
+                    {(!selectedAgent.websiteIds || selectedAgent.websiteIds.length === 0) ? (
+                      <p className="text-[10px] font-bold text-slate-400 bg-slate-50 px-5 py-6 rounded-2xl border border-dashed border-slate-200 text-center uppercase tracking-widest">No domains assigned.</p>
+                    ) : selectedAgent.websiteIds.map((website) => (
+                      <div key={website._id || website} className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                        <div className="p-2 bg-slate-50 rounded-lg shrink-0">
+                          <Globe size={14} className="text-slate-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{website.websiteName || website.domain || website}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
       </>
     );
   }
 
   /* ── Reports Tab ── */
   if (tab === "reports") {
+    if (!canUseReports) {
+      return (
+        <Layout menuItems={menuItems} title="Plan Upgrade Required" subtitle="Reports are available on higher plans">
+          <div className="rounded-[40px] border border-sky-100 bg-sky-50 p-12 text-center">
+            <h3 className="text-lg font-black text-sky-900 uppercase tracking-tight">Reporting not included</h3>
+            <p className="mt-3 text-sm font-bold text-sky-700">Upgrade this client plan to unlock manager reporting and performance analytics.</p>
+          </div>
+        </Layout>
+      );
+    }
     return (
       <Layout
         menuItems={menuItems}

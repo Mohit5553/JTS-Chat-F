@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@stripe/stripe-js": "^9.0.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.577.0",

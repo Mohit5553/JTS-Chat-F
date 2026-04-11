@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { API_BASE } from "../api/client.js";
 
-const STATUS_STEPS = ["open", "in_progress", "resolved", "closed"];
+const STATUS_STEPS = ["open", "in_progress", "waiting", "resolved", "closed"];
 
 const STATUS_CONFIG = {
   open:         { label: "Open",        desc: "Your ticket has been received and is awaiting assignment.",   color: "#6366f1", bg: "bg-indigo-50 dark:bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400" },
   in_progress:  { label: "In Progress", desc: "An agent is reviewing your request and will update you soon.", color: "#f59e0b", bg: "bg-amber-50 dark:bg-amber-500/10", text: "text-amber-600 dark:text-amber-400" },
+  waiting:      { label: "Waiting",     desc: "We are waiting on a response or internal action before progressing this ticket.", color: "#8b5cf6", bg: "bg-violet-50 dark:bg-violet-500/10", text: "text-violet-600 dark:text-violet-400" },
   pending:      { label: "In Progress", desc: "An agent is reviewing your request and will update you soon.", color: "#f59e0b", bg: "bg-amber-50 dark:bg-amber-500/10", text: "text-amber-600 dark:text-amber-400" },
   resolved:     { label: "Resolved",    desc: "Your issue has been resolved. Please let us know if you need more help.", color: "#10b981", bg: "bg-emerald-50 dark:bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" },
   closed:       { label: "Closed",      desc: "This ticket has been closed. Thank you for reaching out!", color: "#64748b", bg: "bg-slate-100 dark:bg-white/5", text: "text-slate-500 dark:text-slate-400" }

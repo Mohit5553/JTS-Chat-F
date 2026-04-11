@@ -9,11 +9,13 @@ import { api, API_BASE } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import PaginationControls from "./PaginationControls.jsx";
 import { getPaginationMeta } from "../utils/pagination.js";
+import { cleanString } from "../utils/stringUtils.js";
 import ActivityTimeline from "./ActivityTimeline.jsx";
 
 const STATUS_CONFIG = {
    open: { label: "Open", color: "bg-blue-50 text-blue-600 border-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20", dot: "bg-blue-500" },
    in_progress: { label: "In Progress", color: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20", dot: "bg-amber-500" },
+   waiting: { label: "Waiting", color: "bg-violet-50 text-violet-600 border-violet-100 dark:bg-violet-500/10 dark:text-violet-400 dark:border-violet-500/20", dot: "bg-violet-500" },
    pending: { label: "Pending", color: "bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20", dot: "bg-amber-500" },
    resolved: { label: "Resolved", color: "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20", dot: "bg-emerald-500" },
    closed: { label: "Closed", color: "bg-slate-100 text-slate-500 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/5", dot: "bg-slate-400" }
@@ -41,17 +43,18 @@ function getSLADetails(ticket) {
   if (!ticket?.createdAt) return null;
   if (["resolved", "closed"].includes(ticket.status)) return null;
 
-  const createdAt = new Date(ticket.createdAt);
-  if (Number.isNaN(createdAt.getTime())) return null;
-
-  const priorityHours = {
-    low: 48,
-    medium: 24,
-    high: 8,
-    urgent: 2
-  };
-
-  const dueAt = new Date(createdAt.getTime() + (priorityHours[ticket.priority] || 24) * 60 * 60 * 1000);
+  const dueAt = ticket.resolutionDueAt ? new Date(ticket.resolutionDueAt) : (() => {
+    const createdAt = new Date(ticket.createdAt);
+    if (Number.isNaN(createdAt.getTime())) return null;
+    const priorityHours = {
+      low: 48,
+      medium: 24,
+      high: 8,
+      urgent: 2
+    };
+    return new Date(createdAt.getTime() + (priorityHours[ticket.priority] || 24) * 60 * 60 * 1000);
+  })();
+  if (!dueAt || Number.isNaN(dueAt.getTime())) return null;
   const diffMs = dueAt.getTime() - Date.now();
   const isBreached = diffMs < 0;
   const absMinutes = Math.round(Math.abs(diffMs) / 60000);
@@ -630,7 +633,7 @@ export default function TicketManager({ websiteId }) {
 
          {/* Analytics Tabs */}
          <div className="flex gap-4 flex-wrap bg-slate-50/50 dark:bg-white/5 p-2.5 rounded-[32px] border border-slate-100 dark:border-white/5 w-fit">
-            {["all", "open", "in_progress", "resolved", "closed"].map(s => (
+            {["all", "open", "in_progress", "waiting", "resolved", "closed"].map(s => (
                <button
                   key={s}
                   onClick={() => setFilterStatus(s)}
@@ -646,8 +649,8 @@ export default function TicketManager({ websiteId }) {
          {error && <div className="bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 text-red-600 dark:text-red-400 px-8 py-5 rounded-[28px] text-[11px] font-black uppercase tracking-widest shadow-xl animate-in shake duration-500">{error}</div>}
 
          {viewMode === "board" ? (
-         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-            {["open", "in_progress", "pending", "resolved", "closed"].map((statusKey) => (
+         <div className="grid grid-cols-1 xl:grid-cols-6 gap-6">
+            {["open", "in_progress", "waiting", "pending", "resolved", "closed"].map((statusKey) => (
                <section key={statusKey} className="rounded-[32px] border border-slate-200/70 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
                   <div className="p-5 border-b border-slate-100 dark:border-white/5 bg-slate-50/70 dark:bg-white/5">
                      <div className="flex items-center gap-3">
@@ -686,8 +689,8 @@ export default function TicketManager({ websiteId }) {
                                     {ticket.visitorId?.name?.[0] || "A"}
                                  </div>
                                  <div className="min-w-0">
-                                    <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">{ticket.visitorId?.name || "Anonymous"}</p>
-                                    <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 truncate">{ticket.visitorId?.email || "No email"}</p>
+                                    <p className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">{cleanString(ticket.visitorId?.name, "Anonymous")}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 truncate">{cleanString(ticket.visitorId?.email, "No email")}</p>
                                  </div>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -795,8 +798,8 @@ export default function TicketManager({ websiteId }) {
                                  {ticket.visitorId?.name?.[0] || "A"}
                               </div>
                               <div>
-                                 <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{ticket.visitorId?.name || "Participant Alpha"}</p>
-                                 <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{ticket.visitorId?.email || "Encrypted Vector"}</p>
+                                 <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tight">{cleanString(ticket.visitorId?.name, "Participant Alpha")}</p>
+                                 <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{cleanString(ticket.visitorId?.email, "Encrypted Vector")}</p>
                               </div>
                            </div>
                         </div>

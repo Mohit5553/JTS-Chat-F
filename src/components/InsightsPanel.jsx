@@ -51,7 +51,7 @@ export default function InsightsPanel({ onViewLead }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KpiCard 
           label="Pipeline Value" 
-          value={`$${summary.totalPipelineValue.toLocaleString()}`} 
+          value={`INR ${summary.totalPipelineValue.toLocaleString()}`} 
           icon={<DollarSign size={20} />}
           subValue={`${summary.totalLeads} Active Leads`}
           color="bg-indigo-600"
@@ -65,14 +65,14 @@ export default function InsightsPanel({ onViewLead }) {
         />
         <KpiCard 
           label="Avg Deal Size" 
-          value={`$${summary.averageDealSize.toLocaleString()}`} 
+          value={`INR ${summary.averageDealSize.toLocaleString()}`} 
           icon={<TrendingUp size={20} />}
           subValue="Revenue per lead"
           color="bg-violet-500"
         />
         <KpiCard 
           label="Won Revenue" 
-          value={`$${summary.wonRevenue.toLocaleString()}`} 
+          value={`INR ${summary.wonRevenue.toLocaleString()}`} 
           icon={<Zap size={20} />}
           subValue="Total realized income"
           color="bg-amber-500"
@@ -92,7 +92,7 @@ export default function InsightsPanel({ onViewLead }) {
            </div>
            
            <div className="space-y-6">
-              {["new", "qualified", "proposition", "won", "lost"].map(stage => {
+              {["new", "contacted", "qualified", "proposal_sent", "negotiation", "won", "lost"].map(stage => {
                  const data = pipeline.find(p => p._id === stage) || { count: 0, totalValue: 0 };
                  const percentage = summary.totalLeads > 0 ? (data.count / summary.totalLeads) * 100 : 0;
                  
@@ -100,7 +100,7 @@ export default function InsightsPanel({ onViewLead }) {
                     <div key={stage} className="space-y-2">
                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
                           <span className="text-slate-500">{stage}</span>
-                          <span className="text-slate-900">{data.count} Leads <span className="text-slate-300 ml-2">(${data.totalValue.toLocaleString()})</span></span>
+                          <span className="text-slate-900">{data.count} Leads <span className="text-slate-300 ml-2">(INR {data.totalValue.toLocaleString()})</span></span>
                        </div>
                        <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100 p-0.5">
                           <div 
@@ -191,7 +191,7 @@ export default function InsightsPanel({ onViewLead }) {
                            </span>
                         </td>
                         <td className="px-8 py-5 text-right font-black text-slate-900 text-xs">
-                           ${lead.leadValue.toLocaleString()}
+                           INR {lead.leadValue.toLocaleString()}
                         </td>
                         <td className="px-8 py-5 text-right">
                            <button 

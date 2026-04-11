@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "../api/client.js";
 import { Paperclip, FileText, Check, CheckCheck, Send, Ticket, PlusCircle, UserPlus } from "lucide-react";
+import { cleanString } from "../utils/stringUtils.js";
 
 function getDeviceIcon(deviceInfo = "") {
   if (/mobile|android|iphone/i.test(deviceInfo)) return "📱";
@@ -154,7 +155,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
     : shortcuts;
 
   const visitor = session.visitorId;
-  const visitorName = visitor?.name || "Anonymous";
+  const visitorName = cleanString(visitor?.name) || cleanString(visitor?.visitorId, "Anonymous User");
   const avatarColor = getAvatarColor(visitorName);
 
   const getRelativeStatus = () => {
@@ -204,6 +205,23 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
                   </>
                 ) : null}
               </div>
+
+              {/* ── Bot Journey Path ── */}
+              {session.botMetadata?.path?.length > 0 && (
+                <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-xl border border-indigo-100/50 dark:border-indigo-500/10 w-fit">
+                  <span className="text-[8px] font-black text-indigo-400 dark:text-indigo-500 uppercase tracking-widest leading-none">Bot Journey:</span>
+                  <div className="flex items-center gap-1">
+                    {session.botMetadata.path.map((step, idx) => (
+                      <div key={idx} className="flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{step}</span>
+                        {idx < session.botMetadata.path.length - 1 && (
+                          <span className="text-slate-300 dark:text-slate-700">→</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

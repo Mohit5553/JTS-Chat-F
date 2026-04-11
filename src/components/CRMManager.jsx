@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import PaginationControls from "./PaginationControls.jsx";
 import ActivityTimeline from "./ActivityTimeline.jsx";
 import { hasPermission } from "../utils/permissions.js";
+import { getPaginationMeta } from "../utils/pagination.js";
+import { cleanString } from "../utils/stringUtils.js";
 import { PERMISSIONS, SALES_ALLOWED_STATUS_TRANSITIONS } from "../constants/domain.js";
 import {
   Search, Filter, User, Calendar, Tag, ChevronRight, MessageCircle,
@@ -15,16 +17,18 @@ import {
 
 const CRM_STAGE_CONFIG = {
   new: { label: "New", color: "bg-violet-50 text-violet-600 border-violet-100", dot: "bg-violet-500" },
+  contacted: { label: "Contacted", color: "bg-sky-50 text-sky-600 border-sky-100", dot: "bg-sky-500" },
   qualified: { label: "Qualified", color: "bg-indigo-50 text-indigo-600 border-indigo-100", dot: "bg-indigo-500" },
-  hold: { label: "Hold", color: "bg-slate-100 text-slate-500 border-slate-200", dot: "bg-slate-400" },
-  proposition: { label: "Proposition", color: "bg-amber-50 text-amber-600 border-amber-100", dot: "bg-amber-500" },
+  proposal_sent: { label: "Proposal Sent", color: "bg-amber-50 text-amber-600 border-amber-100", dot: "bg-amber-500" },
+  negotiation: { label: "Negotiation", color: "bg-orange-50 text-orange-600 border-orange-100", dot: "bg-orange-500" },
   won: { label: "Won", color: "bg-emerald-50 text-emerald-600 border-emerald-100", dot: "bg-emerald-500" },
   lost: { label: "Lost", color: "bg-red-50 text-red-500 border-red-100", dot: "bg-red-400" }
 };
 
 const TICKET_STATUS_CONFIG = {
   open: { label: "Open", color: "bg-emerald-50 text-emerald-600 border-emerald-100", icon: Circle },
-  pending: { label: "Pending", color: "bg-amber-50 text-amber-600 border-amber-100", icon: Clock },
+  waiting: { label: "Waiting", color: "bg-amber-50 text-amber-600 border-amber-100", icon: Clock },
+  pending: { label: "Waiting", color: "bg-amber-50 text-amber-600 border-amber-100", icon: Clock },
   resolved: { label: "Resolved", color: "bg-slate-100 text-slate-500 border-slate-200", icon: CheckCircle2 },
   closed: { label: "Closed", color: "bg-slate-100 text-slate-400 border-slate-100", icon: CheckCircle2 },
 };
@@ -41,6 +45,7 @@ const LEAD_STATUS_STYLES = {
   contacted: "bg-sky-50 text-sky-700 border-sky-200",
   qualified: "bg-indigo-50 text-indigo-700 border-indigo-200",
   proposal_sent: "bg-amber-50 text-amber-700 border-amber-200",
+  negotiation: "bg-orange-50 text-orange-700 border-orange-200",
   prospect: "bg-violet-50 text-violet-700 border-violet-200",
   lead: "bg-cyan-50 text-cyan-700 border-cyan-200",
   customer: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -138,9 +143,10 @@ function CRMPipelineBar({ customers }) {
 
   const stages = [
     { key: "new", label: "New", color: "bg-violet-500", count: pipelineCounts.new || 0 },
+    { key: "contacted", label: "Contacted", color: "bg-sky-500", count: pipelineCounts.contacted || 0 },
     { key: "qualified", label: "Qualified", color: "bg-indigo-500", count: pipelineCounts.qualified || 0 },
-    { key: "hold", label: "Hold", color: "bg-slate-400", count: pipelineCounts.hold || 0 },
-    { key: "proposition", label: "Proposition", color: "bg-amber-500", count: pipelineCounts.proposition || 0 },
+    { key: "proposal_sent", label: "Proposal", color: "bg-amber-500", count: pipelineCounts.proposal_sent || 0 },
+    { key: "negotiation", label: "Negotiation", color: "bg-orange-500", count: pipelineCounts.negotiation || 0 },
     { key: "won", label: "Won", color: "bg-emerald-500", count: pipelineCounts.won || 0 },
     { key: "lost", label: "Lost", color: "bg-red-400", count: pipelineCounts.lost || 0 },
   ];
@@ -229,6 +235,9 @@ export default function CRMManager({ websiteId = "", initialLeadData = null, hig
         companyName: initialLeadData.companyName || "",
         leadSource: initialLeadData.leadSource || "website",
         leadValue: initialLeadData.leadValue || "",
+        budget: initialLeadData.budget || "",
+        interestLevel: initialLeadData.interestLevel || "warm",
+        probability: initialLeadData.probability || "",
         priority: initialLeadData.priority || "medium",
         ownerId: initialLeadData.ownerId || user?._id || "",
         notes: initialLeadData.notes || "",
@@ -260,6 +269,9 @@ export default function CRMManager({ websiteId = "", initialLeadData = null, hig
     companyName: "",
     leadSource: "",
     leadValue: 0,
+    budget: 0,
+    interestLevel: "warm",
+    probability: "",
     expectedCloseDate: "",
     websiteId: websiteId || "",
     status: "new",
@@ -297,6 +309,9 @@ export default function CRMManager({ websiteId = "", initialLeadData = null, hig
       companyName: selectedCustomer.companyName || "",
       leadSource: selectedCustomer.leadSource || "",
       leadValue: selectedCustomer.leadValue || 0,
+      budget: selectedCustomer.budget || 0,
+      interestLevel: selectedCustomer.interestLevel || "warm",
+      probability: selectedCustomer.probability || "",
       expectedCloseDate: selectedCustomer.expectedCloseDate ? selectedCustomer.expectedCloseDate.substring(0, 10) : "",
       websiteId: selectedCustomer.websiteId?._id || selectedCustomer.websiteId || websiteId || "",
       status: selectedCustomer.status || "new",
@@ -587,18 +602,19 @@ ${salesName}`
     }
   };
 
-  const openTicketCount = customerDetails?.tickets?.filter(t => ["open", "pending", "in_progress"].includes(t.status)).length || 0;
+  const openTicketCount = customerDetails?.tickets?.filter(t => ["open", "waiting", "pending", "in_progress"].includes(t.status)).length || 0;
   const boardColumns = [
     { key: "new", label: "New", tone: "from-violet-500 to-fuchsia-500" },
+    { key: "contacted", label: "Contacted", tone: "from-sky-500 to-cyan-500" },
     { key: "qualified", label: "Qualified", tone: "from-indigo-500 to-sky-500" },
-    { key: "hold", label: "Hold", tone: "from-slate-400 to-slate-500" },
-    { key: "proposition", label: "Proposition", tone: "from-amber-500 to-orange-500" },
+    { key: "proposal_sent", label: "Proposal Sent", tone: "from-amber-500 to-orange-500" },
+    { key: "negotiation", label: "Negotiation", tone: "from-orange-500 to-red-500" },
     { key: "won", label: "Won", tone: "from-emerald-500 to-teal-500" },
     { key: "lost", label: "Lost", tone: "from-rose-500 to-red-500" }
   ];
 
   const workspaceCards = [
-    { key: "all", label: "Pipeline", value: pagination.total || customers.length, helper: "Active records in current view", icon: LayoutGrid },
+    { key: "all", label: "Pipeline", value: summary.totalLeads || pagination.total || customers.length, helper: "Active records in current view", icon: LayoutGrid },
     { key: "my_leads", label: "Assigned to Me", value: summary.myLeads || 0, helper: "Owned by current seller", icon: UserCheck },
     { key: "due_today", label: "Follow Up Today", value: summary.dueToday || 0, helper: "Activities due this business day", icon: Clock },
     { key: "no_follow_up", label: "Missing Next Step", value: summary.noFollowUp || 0, helper: "Needs an activity planned", icon: AlertCircle },
@@ -636,6 +652,9 @@ ${salesName}`
       companyName: "",
       leadSource: "",
       leadValue: 0,
+      budget: 0,
+      interestLevel: "warm",
+      probability: "",
       expectedCloseDate: "",
       websiteId: websiteId || "",
       status: "new",
@@ -671,6 +690,8 @@ ${salesName}`
         const payload = {
           ...createLeadForm,
           leadValue: Number(createLeadForm.leadValue || 0),
+          budget: Number(createLeadForm.budget || 0),
+          probability: createLeadForm.probability === "" ? undefined : Number(createLeadForm.probability || 0),
           ownerId: createLeadForm.ownerId || null,
           tags: createLeadForm.tags
             ? createLeadForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
@@ -684,7 +705,7 @@ ${salesName}`
         delete payload.websiteId;
 
         const updated = await api(`/api/crm/${editLeadId}`, {
-          method: "PUT",
+          method: "PATCH",
           body: JSON.stringify(payload)
         });
         syncCustomerState(updated);
@@ -701,6 +722,8 @@ ${salesName}`
             ...createLeadForm,
             websiteId: finalWebsiteId,
             leadValue: Number(createLeadForm.leadValue || 0),
+            budget: Number(createLeadForm.budget || 0),
+            probability: createLeadForm.probability === "" ? undefined : Number(createLeadForm.probability || 0),
             ownerId: createLeadForm.ownerId || null,
             tags: createLeadForm.tags
               ? createLeadForm.tags.split(",").map((tag) => tag.trim()).filter(Boolean)
@@ -802,19 +825,19 @@ ${salesName}`
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:w-[540px]">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Open Pipeline</p>
-                  <p className="mt-2 text-lg font-black text-slate-950">{pagination.total || customers.length}</p>
+                  <p className="mt-2 text-lg font-black text-slate-950">{summary.totalLeads || pagination.total || customers.length}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Expected Value</p>
-                  <p className="mt-2 text-lg font-black text-slate-950">{formatCurrency(customers.reduce((sum, customer) => sum + Number(customer.leadValue || 0), 0))}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Pipeline Value</p>
+                  <p className="mt-2 text-lg font-black text-slate-950">{formatCurrency(summary.pipelineValue || customers.reduce((sum, customer) => sum + Number(customer.leadValue || 0), 0))}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Won Deals</p>
-                  <p className="mt-2 text-lg font-black text-emerald-600">{summary.won || customers.filter((customer) => customer.pipelineStage === "won").length}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Conversion Rate</p>
+                  <p className="mt-2 text-lg font-black text-emerald-600">{summary.conversionRate || 0}%</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">At Risk</p>
-                  <p className="mt-2 text-lg font-black text-amber-600">{(summary.noFollowUp || 0) + (summary.dueToday || 0)}</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Won Revenue</p>
+                  <p className="mt-2 text-lg font-black text-amber-600">{formatCurrency(summary.revenue || 0)}</p>
                 </div>
               </div>
             </div>
@@ -864,10 +887,13 @@ ${salesName}`
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-700 outline-none transition-all focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/5"
               >
                 <option value="">All statuses</option>
-                <option value="prospect">Prospect</option>
-                <option value="lead">Lead</option>
-                <option value="customer">Customer</option>
-                <option value="inactive">Inactive</option>
+                <option value="new">New</option>
+                <option value="contacted">Contacted</option>
+                <option value="qualified">Qualified</option>
+                <option value="proposal_sent">Proposal Sent</option>
+                <option value="negotiation">Negotiation</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
               </select>
               <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 p-1.5 self-stretch md:self-auto">
                 <button
@@ -1003,8 +1029,8 @@ ${salesName}`
                                 {customer.name?.[0]?.toUpperCase() || "U"}
                               </div>
                               <div className="min-w-0">
-                                <h4 className="text-[12px] font-black text-slate-950 tracking-tight truncate">{customer.name}</h4>
-                                <p className="text-[10px] text-slate-400 font-bold truncate">{customer.companyName || customer.email}</p>
+                                <h4 className="text-[12px] font-black text-slate-950 tracking-tight truncate">{cleanString(customer.name, "Anonymous Lead")}</h4>
+                                <p className="text-[10px] text-slate-400 font-bold truncate">{cleanString(customer.companyName) || cleanString(customer.email, "No contact info")}</p>
                               </div>
                             </div>
                             <ChevronRight size={16} className="text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
@@ -1057,6 +1083,14 @@ ${salesName}`
                               <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-[0.16em]">
                                 <span className="text-slate-400">Source</span>
                                 <span className="text-slate-700 truncate text-right">{customer.leadSource || "Manual"}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-[0.16em]">
+                                <span className="text-slate-400">Interest</span>
+                                <span className="text-slate-700 truncate text-right">{customer.interestLevel || "Warm"}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-[0.16em]">
+                                <span className="text-slate-400">Probability</span>
+                                <span className="text-slate-700 truncate text-right">{customer.probability || 0}%</span>
                               </div>
                               <div className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-[0.16em]">
                                 <span className="text-slate-400">Last touch</span>
@@ -1279,24 +1313,24 @@ ${salesName}`
               <div className="px-5 py-4 md:px-8 border-b border-slate-100 bg-white grid grid-cols-4 gap-4 sticky top-0 z-[11]">
                 <div className="space-y-1">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pipeline Stage</p>
-                  <CRMStageBadge stage={selectedCustomer?.status} />
+                  <CRMStageBadge stage={selectedCustomer?.pipelineStage} />
                 </div>
                 <div className="space-y-1">
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Est. Value</p>
                   <p className="text-xs font-black text-slate-900">{formatCurrency(selectedCustomer?.leadValue)}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Conversion</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Probability</p>
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-12 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: "65%" }} />
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.max(0, Math.min(100, Number(selectedCustomer?.probability || 0)))}%` }} />
                     </div>
-                    <span className="text-[10px] font-black text-indigo-600">65%</span>
+                    <span className="text-[10px] font-black text-indigo-600">{selectedCustomer?.probability || 0}%</span>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Chats</p>
-                  <p className="text-xs font-black text-slate-900">{customerDetails?.sessions?.length || 0}</p>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Open Tickets</p>
+                  <p className="text-xs font-black text-slate-900">{openTicketCount}</p>
                 </div>
               </div>
 
@@ -1712,6 +1746,34 @@ ${salesName}`
                       <option value="high">High Priority</option>
                     </select>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interest Level</label>
+                    <select
+                      value={createLeadForm.interestLevel}
+                      onChange={(e) => setCreateLeadForm(prev => ({ ...prev, interestLevel: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/5"
+                    >
+                      <option value="cold">Cold</option>
+                      <option value="warm">Warm</option>
+                      <option value="hot">Hot</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pipeline Stage</label>
+                    <select
+                      value={createLeadForm.pipelineStage}
+                      onChange={(e) => setCreateLeadForm(prev => ({ ...prev, pipelineStage: e.target.value, status: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/5"
+                    >
+                      <option value="new">New Lead</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="proposal_sent">Proposal Sent</option>
+                      <option value="negotiation">Negotiation</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -1726,6 +1788,28 @@ ${salesName}`
                       value={createLeadForm.leadValue}
                       onChange={(e) => setCreateLeadForm(prev => ({ ...prev, leadValue: e.target.value }))}
                       placeholder="0.00"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/5"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Budget (â‚¹)</label>
+                    <input
+                      type="number"
+                      value={createLeadForm.budget}
+                      onChange={(e) => setCreateLeadForm(prev => ({ ...prev, budget: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/5"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Probability %</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={createLeadForm.probability}
+                      onChange={(e) => setCreateLeadForm(prev => ({ ...prev, probability: e.target.value }))}
+                      placeholder="Auto"
                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/5"
                     />
                   </div>

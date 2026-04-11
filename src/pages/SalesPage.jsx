@@ -173,7 +173,7 @@ function SalesChatsPanel({ onConvertToLead }) {
               <div className="space-y-1">
                  <p className="text-[10px] font-bold text-slate-400 break-all">{session.visitorId?.email || session.visitorId?.visitorId || "No contact info"}</p>
                  <p className="text-[12px] font-medium text-slate-600 line-clamp-1 italic">
-                   "{session.lastMessagePreview || "Waiting for interaction..."}"
+                   &ldquo;{session.lastMessagePreview || "Waiting for interaction..."}&rdquo;
                  </p>
               </div>
 
@@ -336,6 +336,7 @@ export default function SalesPage() {
   const [initialLeadData, setInitialLeadData] = useState(null);
   const [highlightLeadId, setHighlightLeadId] = useState(null);
   const canUseCRM = hasModule(user, "crm");
+  const canUseReports = hasModule(user, "reports");
 
   const handleConvertLead = (session) => {
     setInitialLeadData({
@@ -355,11 +356,11 @@ export default function SalesPage() {
   };
 
   const menuItems = [
-    { label: "Insights", href: "/sales?tab=insights" },
     { label: "Pipeline", href: "/sales" },
     { label: "Tasks", href: "/sales?tab=tasks" },
     { label: "Notes", href: "/sales?tab=notes" },
-    { label: "Chats", href: "/sales?tab=chats" }
+    { label: "Chats", href: "/sales?tab=chats" },
+    ...(canUseReports ? [{ label: "Insights", href: "/sales?tab=insights" }] : [])
   ];
 
   if (!canUseCRM && activeTab === "pipeline") {
@@ -374,6 +375,16 @@ export default function SalesPage() {
   }
 
   if (activeTab === "insights") {
+    if (!canUseReports) {
+      return (
+        <Layout menuItems={menuItems} title="Plan Upgrade Required" subtitle="Reports are not enabled for this account">
+          <div className="rounded-[40px] border border-sky-100 bg-sky-50 p-12 text-center">
+            <h3 className="text-lg font-black text-sky-900 uppercase tracking-tight">Reports not included</h3>
+            <p className="mt-3 text-sm font-bold text-sky-700">Enable reporting to unlock sales insights and performance analytics.</p>
+          </div>
+        </Layout>
+      );
+    }
     return (
       <Layout menuItems={menuItems} title="Sales Intelligence" subtitle="Performance metrics and revenue projection">
          <InsightsPanel onViewLead={handleViewLead} />

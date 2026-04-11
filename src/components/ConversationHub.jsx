@@ -5,6 +5,7 @@ import ChatPanel from "./ChatPanel.jsx";
 import TicketConversionModal from "./TicketConversionModal.jsx";
 import { api } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
+import { cleanString } from "../utils/stringUtils.js";
 
 export default function ConversationHub({ socket, initialSessions = [], websiteId }) {
   const toast = useToast();
@@ -190,11 +191,11 @@ export default function ConversationHub({ socket, initialSessions = [], websiteI
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] transition-all ${selectedSessionId === session.sessionId ? 'bg-indigo-600 text-white shadow-lg rotate-3' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>
-                    {(session.visitorId?.visitorId || 'AN').slice(0, 2).toUpperCase()}
+                    {(cleanString(session.visitorId?.name) || cleanString(session.visitorId?.visitorId) || 'AN').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-[10px] text-slate-900 dark:text-slate-300 font-black tracking-widest uppercase truncate block">
-                      {session.visitorId?.visitorId || 'Anonymous User'}
+                      {cleanString(session.visitorId?.name) || cleanString(session.visitorId?.visitorId, 'Anonymous User')}
                     </span>
                     {session.lastMessagePreview ? (
                       <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1 opacity-80 font-bold mt-0.5">
@@ -238,6 +239,7 @@ export default function ConversationHub({ socket, initialSessions = [], websiteI
           messages={messages}
           onSend={handleSend}
           onTyping={(isTyping) => socket?.emit("agent:typing", { sessionId: selectedSessionId, isTyping })}
+          canUseShortcuts={true}
           onConvertToTicket={(s) => {
             setSessionToConvert(s);
             setShowTicketModal(true);
