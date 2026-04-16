@@ -45,7 +45,7 @@ export default function AgentPage() {
   const [ticketResult, setTicketResult] = useState(null);
   const [ticketSaving, setTicketSaving] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  
+
   const [customerHistory, setCustomerHistory] = useState(null);
   const [historyModal, setHistoryModal] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -109,7 +109,7 @@ export default function AgentPage() {
       setCustomerHistory(null);
     }
     if (ticketModal && selectedSession?.websiteId?._id) {
-       api(`/api/categories?websiteId=${selectedSession.websiteId._id}`).then(setCategories).catch(err => console.warn("Categories failed", err));
+      api(`/api/categories?websiteId=${selectedSession.websiteId._id}`).then(setCategories).catch(err => console.warn("Categories failed", err));
     }
   }, [selectedSessionId, selectedSession?.crn, ticketModal, selectedSession?.websiteId?._id]);
 
@@ -129,11 +129,11 @@ export default function AgentPage() {
       loadSessions();
       if (payload.sender === "visitor") {
         NotificationService.notify(`Message from ${payload.sessionId.substring(0, 8)}`, payload.message);
-        
+
         if (payload.sessionId === selectedSessionIdRef.current) {
           socket.emit("chat:history:read", { sessionId: payload.sessionId });
         }
-        
+
         try {
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const osc = ctx.createOscillator();
@@ -145,7 +145,9 @@ export default function AgentPage() {
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
           osc.start(ctx.currentTime);
           osc.stop(ctx.currentTime + 0.2);
-        } catch (_) {}
+        } catch (error) {
+          console.error("Failed to play new message notification sound:", error);
+        }
       }
       if (payload.sessionId === selectedSessionIdRef.current && payload.sender === "visitor") {
         setMessages((current) => dedupeMessages([...current, payload]));
@@ -198,7 +200,9 @@ export default function AgentPage() {
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
-      } catch (_) {}
+      } catch (error) {
+        console.error("Failed to play chat assignment notification sound:", error);
+      }
       NotificationService.notify("New Chat Assigned", "You have a new visitor waiting for support.");
     });
 
@@ -247,8 +251,8 @@ export default function AgentPage() {
     event.preventDefault();
     try {
       const updatedUser = await api("/api/users/profile", {
-         method: "PATCH",
-         body: JSON.stringify(profileForm)
+        method: "PATCH",
+        body: JSON.stringify(profileForm)
       });
       setUser(updatedUser);
       setProfileForm({ ...profileForm, password: "" });
@@ -262,7 +266,7 @@ export default function AgentPage() {
     if (!socket || !selectedSessionId) return;
 
     const messageText = typeof payload === 'string' ? payload : (payload.text || "Sent an attachment");
-    
+
     const tempMsg = {
       _id: `temp-${Date.now()}`,
       sessionId: selectedSessionId,
@@ -349,14 +353,14 @@ export default function AgentPage() {
 
   const searchedSessions = sessionSearch
     ? sessions.filter(s =>
-        s.websiteId?.websiteName?.toLowerCase().includes(sessionSearch.toLowerCase()) ||
-        s.visitorId?.visitorId?.toLowerCase().includes(sessionSearch.toLowerCase())
-      )
+      s.websiteId?.websiteName?.toLowerCase().includes(sessionSearch.toLowerCase()) ||
+      s.visitorId?.visitorId?.toLowerCase().includes(sessionSearch.toLowerCase())
+    )
     : sessions;
 
-  const activeSessions  = searchedSessions.filter(s => s.status === "active" || s.status === "queued");
-  const closedSessions  = searchedSessions.filter(s => s.status === "closed");
-  const trashSessions   = closedSessions.filter(s => new Date() - new Date(s.closedAt || s.updatedAt) > 7 * 86400000);
+  const activeSessions = searchedSessions.filter(s => s.status === "active" || s.status === "queued");
+  const closedSessions = searchedSessions.filter(s => s.status === "closed");
+  const trashSessions = closedSessions.filter(s => new Date() - new Date(s.closedAt || s.updatedAt) > 7 * 86400000);
 
   const sessionTabMap = { active: activeSessions, closed: closedSessions, trash: trashSessions };
   const visibleSessions = sessionTabMap[sessionTab] ?? activeSessions;
@@ -372,9 +376,9 @@ export default function AgentPage() {
   }, [sessions.length]);
 
   const SESSION_TABS = [
-    { key: "active",  label: "Active",  count: activeSessions.length,  dot: "bg-emerald-500" },
-    { key: "closed",  label: "Closed",  count: closedSessions.length,  dot: "bg-slate-400" },
-    { key: "trash",   label: "Trash",   count: trashSessions.length,   dot: "bg-red-400" },
+    { key: "active", label: "Active", count: activeSessions.length, dot: "bg-emerald-500" },
+    { key: "closed", label: "Closed", count: closedSessions.length, dot: "bg-slate-400" },
+    { key: "trash", label: "Trash", count: trashSessions.length, dot: "bg-red-400" },
   ];
 
   const content = tab === "chats" ? (
@@ -388,11 +392,10 @@ export default function AgentPage() {
           <button
             type="button"
             onClick={toggleAvailability}
-            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow ${
-              user?.isAvailable
-                ? "bg-slate-950 text-white hover:bg-black"
-                : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200"
-            }`}
+            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all shadow ${user?.isAvailable
+              ? "bg-slate-950 text-white hover:bg-black"
+              : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200"
+              }`}
           >
             {user?.isAvailable ? "Deactivate" : "Activate"}
           </button>
@@ -403,17 +406,16 @@ export default function AgentPage() {
             <button
               key={t.key}
               onClick={() => setSessionTab(t.key)}
-              className={`flex-1 py-3 flex flex-col items-center gap-0.5 text-[9px] font-black uppercase tracking-widest transition-all border-b-2 ${
-                sessionTab === t.key
-                  ? "border-indigo-600 text-indigo-600 bg-white"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 text-[9px] font-black uppercase tracking-widest transition-all border-b-2 ${sessionTab === t.key
+                ? "border-indigo-600 text-indigo-600 bg-white"
+                : "border-transparent text-slate-400 hover:text-slate-600"
+                }`}
             >
               <span className="flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
                 {t.label}
               </span>
-              <span className={`text-base font-black leading-none ${ sessionTab === t.key ? "text-indigo-600" : "text-slate-500"}`}>{t.count}</span>
+              <span className={`text-base font-black leading-none ${sessionTab === t.key ? "text-indigo-600" : "text-slate-500"}`}>{t.count}</span>
             </button>
           ))}
         </div>
@@ -439,16 +441,15 @@ export default function AgentPage() {
             <div
               key={session._id}
               onClick={() => setSelectedSessionId(session.sessionId)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${
-                selectedSessionId === session.sessionId
-                  ? "bg-white border-indigo-200 shadow-xl translate-x-1"
-                  : "bg-white border-slate-100 hover:border-slate-200"
-              }`}
+              className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden group ${selectedSessionId === session.sessionId
+                ? "bg-white border-indigo-200 shadow-xl translate-x-1"
+                : "bg-white border-slate-100 hover:border-slate-200"
+                }`}
             >
               {selectedSessionId === session.sessionId && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-600 rounded-l-2xl" />}
               <div className="relative z-10 space-y-1 pl-1">
                 <div className="flex items-center justify-between">
-                  <strong className={`text-[10px] font-black tracking-wide block uppercase transition-colors ${ selectedSessionId === session.sessionId ? 'text-indigo-600' : 'text-slate-900'}`}>
+                  <strong className={`text-[10px] font-black tracking-wide block uppercase transition-colors ${selectedSessionId === session.sessionId ? 'text-indigo-600' : 'text-slate-900'}`}>
                     {session.websiteId?.websiteName || "—"}
                   </strong>
                   {session.crn && (
@@ -456,11 +457,10 @@ export default function AgentPage() {
                       {session.crn}
                     </span>
                   )}
-                  <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                    session.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                  <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${session.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                     session.status === 'queued' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                    'bg-slate-50 text-slate-400 border-slate-100'
-                  }`}>{session.status}</span>
+                      'bg-slate-50 text-slate-400 border-slate-100'
+                    }`}>{session.status}</span>
                 </div>
                 <span className="text-[9px] text-slate-400 font-bold tracking-widest uppercase block truncate">
                   {session.visitorId?.visitorId}
@@ -489,17 +489,17 @@ export default function AgentPage() {
       </div>
 
       <div className="lg:col-span-8 flex flex-col gap-8">
-        <ChatPanel 
-           session={selectedSession} 
-           messages={messages} 
-           onSend={sendMessage}
-           onTyping={sendTyping}
-           isTyping={typingSessions[selectedSessionId]}
-           onConvertToTicket={isBasicUser || !canUseTickets ? null : () => { setTicketModal(true); setTicketResult(null); }}
-           canUseShortcuts={!isBasicUser && canUseShortcuts}
-           disabled={!user?.isAvailable} 
+        <ChatPanel
+          session={selectedSession}
+          messages={messages}
+          onSend={sendMessage}
+          onTyping={sendTyping}
+          isTyping={typingSessions[selectedSessionId]}
+          onConvertToTicket={isBasicUser || !canUseTickets ? null : () => { setTicketModal(true); setTicketResult(null); }}
+          canUseShortcuts={!isBasicUser && canUseShortcuts}
+          disabled={!user?.isAvailable}
         />
-        
+
         {selectedSession && selectedSession.status !== "closed" && (
           <div className="premium-card p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 animate-in zoom-in-95 duration-500 overflow-hidden">
             <div className="space-y-1">
@@ -547,98 +547,98 @@ export default function AgentPage() {
       </div>
     </section>
   ) : tab === "settings" ? (
-      <section className="max-w-xl animate-in slide-in-from-bottom-4 duration-700">
-        <form className="premium-card p-10 space-y-8" onSubmit={updateProfile}>
-           <div className="flex flex-col gap-1">
-              <h3 className="heading-md">Security Identity</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Manage your personal platform credentials.</p>
-           </div>
-           <div className="space-y-5">
-              <div className="space-y-1.5">
-                  <label className="small-label">Display Name</label>
-                  <input
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                    placeholder="Your Name"
-                    required
-                  />
-              </div>
-              <div className="space-y-1.5">
-                  <label className="small-label">Communication Access (Email)</label>
-                  <input
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    type="email"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                    placeholder="name@example.com"
-                    required
-                  />
-              </div>
-              <div className="space-y-1.5 pt-4 border-t border-slate-100">
-                  <label className="small-label text-slate-400">Update Encryption Key (Optional)</label>
-                  <input
-                    value={profileForm.password}
-                    onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
-                    type="password"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
-                    placeholder="Leave blank to keep unchanged"
-                  />
-              </div>
-           </div>
-           <button type="submit" className="w-full bg-slate-950 hover:bg-black text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center justify-center">
-              Synchronize Identity Profile
-           </button>
-        </form>
-      </section>
-  ) : tab === "shortcuts" && !isBasicUser && canUseShortcuts ? (
-      <section className="animate-in slide-in-from-bottom-4 duration-700">
-        <CannedResponseManager />
-      </section>
-  ) : tab === "shortcuts" && !isBasicUser && !canUseShortcuts ? (
-      <section className="animate-in slide-in-from-bottom-4 duration-700">
-        <div className="rounded-[40px] border border-indigo-100 bg-indigo-50 p-12 text-center">
-          <h3 className="text-lg font-black text-indigo-900 uppercase tracking-tight">Shortcuts not included</h3>
-          <p className="mt-3 text-sm font-bold text-indigo-700">This client package does not include the shortcuts module.</p>
+    <section className="max-w-xl animate-in slide-in-from-bottom-4 duration-700">
+      <form className="premium-card p-10 space-y-8" onSubmit={updateProfile}>
+        <div className="flex flex-col gap-1">
+          <h3 className="heading-md">Security Identity</h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Manage your personal platform credentials.</p>
         </div>
-      </section>
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="small-label">Display Name</label>
+            <input
+              value={profileForm.name}
+              onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+              placeholder="Your Name"
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="small-label">Communication Access (Email)</label>
+            <input
+              value={profileForm.email}
+              onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+              type="email"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+              placeholder="name@example.com"
+              required
+            />
+          </div>
+          <div className="space-y-1.5 pt-4 border-t border-slate-100">
+            <label className="small-label text-slate-400">Update Encryption Key (Optional)</label>
+            <input
+              value={profileForm.password}
+              onChange={(e) => setProfileForm({ ...profileForm, password: e.target.value })}
+              type="password"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-xs font-bold focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-300"
+              placeholder="Leave blank to keep unchanged"
+            />
+          </div>
+        </div>
+        <button type="submit" className="w-full bg-slate-950 hover:bg-black text-white font-black text-[10px] uppercase tracking-[0.2em] py-5 rounded-2xl shadow-xl shadow-slate-200 transition-all flex items-center justify-center">
+          Synchronize Identity Profile
+        </button>
+      </form>
+    </section>
+  ) : tab === "shortcuts" && !isBasicUser && canUseShortcuts ? (
+    <section className="animate-in slide-in-from-bottom-4 duration-700">
+      <CannedResponseManager />
+    </section>
+  ) : tab === "shortcuts" && !isBasicUser && !canUseShortcuts ? (
+    <section className="animate-in slide-in-from-bottom-4 duration-700">
+      <div className="rounded-[40px] border border-indigo-100 bg-indigo-50 p-12 text-center">
+        <h3 className="text-lg font-black text-indigo-900 uppercase tracking-tight">Shortcuts not included</h3>
+        <p className="mt-3 text-sm font-bold text-indigo-700">This client package does not include the shortcuts module.</p>
+      </div>
+    </section>
   ) : (
     <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <StatCard label="Assigned Load" value={sessions.length.toLocaleString()} />
-            <StatCard label="Network Identity" value={user?.isOnline ? "Verified Online" : "Disconnected"} hint="Active Presence" />
-            <StatCard label="Avg Response" value={sessions.length > 0 ? "Under 30s" : "0s"} trend="Your Target SLA" color="indigo" />
-        </section>
-        <section className="premium-card p-10 space-y-10">
-             <div className="flex flex-col gap-1">
-                <h3 className="heading-md">Health Monitoring</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Real-time status of your assigned ecosystem.</p>
-             </div>
-             <div className="grid grid-cols-1 gap-4">
-                 {paginatedDashboardSessions.pageItems.map(s => (
-                     <div key={s._id} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
-                         <div className="flex items-center gap-5">
-                             <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">🌐</div>
-                             <div>
-                                 <strong className="text-xs font-black text-slate-950 uppercase tracking-tight block">{s.websiteId?.websiteName}</strong>
-                                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.visitorId?.visitorId}</span>
-                             </div>
-                         </div>
-                         <div className="flex items-center gap-3">
-                             <span className="small-label">{s.status}</span>
-                             <div className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.4)]' : 'bg-slate-300'}`}></div>
-                         </div>
-                     </div>
-                 ))}
-             </div>
-             <PaginationControls
-               currentPage={paginatedDashboardSessions.currentPage}
-               totalPages={paginatedDashboardSessions.totalPages}
-               totalItems={paginatedDashboardSessions.totalItems}
-               itemLabel="sessions"
-               onPageChange={setDashboardPage}
-             />
-        </section>
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        <StatCard label="Assigned Load" value={sessions.length.toLocaleString()} />
+        <StatCard label="Network Identity" value={user?.isOnline ? "Verified Online" : "Disconnected"} hint="Active Presence" />
+        <StatCard label="Avg Response" value={sessions.length > 0 ? "Under 30s" : "0s"} trend="Your Target SLA" color="indigo" />
+      </section>
+      <section className="premium-card p-10 space-y-10">
+        <div className="flex flex-col gap-1">
+          <h3 className="heading-md">Health Monitoring</h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Real-time status of your assigned ecosystem.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+          {paginatedDashboardSessions.pageItems.map(s => (
+            <div key={s._id} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
+              <div className="flex items-center gap-5">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">🌐</div>
+                <div>
+                  <strong className="text-xs font-black text-slate-950 uppercase tracking-tight block">{s.websiteId?.websiteName}</strong>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.visitorId?.visitorId}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="small-label">{s.status}</span>
+                <div className={`w-2 h-2 rounded-full ${s.status === 'active' ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.4)]' : 'bg-slate-300'}`}></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <PaginationControls
+          currentPage={paginatedDashboardSessions.currentPage}
+          totalPages={paginatedDashboardSessions.totalPages}
+          totalItems={paginatedDashboardSessions.totalItems}
+          itemLabel="sessions"
+          onPageChange={setDashboardPage}
+        />
+      </section>
     </div>
   );
 
@@ -703,30 +703,30 @@ export default function AgentPage() {
               <form onSubmit={generateTicket} className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pipeline Category</label>
-                     <select 
-                        value={selectedCat} 
-                        onChange={(e) => {
-                           setSelectedCat(e.target.value);
-                           setSelectedSub("");
-                        }}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500"
-                     >
-                        <option value="">Uncategorized</option>
-                        {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
-                     </select>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pipeline Category</label>
+                    <select
+                      value={selectedCat}
+                      onChange={(e) => {
+                        setSelectedCat(e.target.value);
+                        setSelectedSub("");
+                      }}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500"
+                    >
+                      <option value="">Uncategorized</option>
+                      {categories.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
+                    </select>
                   </div>
                   <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-Tier</label>
-                     <select 
-                        value={selectedSub} 
-                        onChange={(e) => setSelectedSub(e.target.value)}
-                        disabled={!selectedCat}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 disabled:opacity-50"
-                     >
-                        <option value="">Select Sub-tier</option>
-                        {categories.find(c => c.name === selectedCat)?.subcategories?.map(s => <option key={s} value={s}>{s}</option>)}
-                     </select>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sub-Tier</label>
+                    <select
+                      value={selectedSub}
+                      onChange={(e) => setSelectedSub(e.target.value)}
+                      disabled={!selectedCat}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-indigo-500 disabled:opacity-50"
+                    >
+                      <option value="">Select Sub-tier</option>
+                      {categories.find(c => c.name === selectedCat)?.subcategories?.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                 </div>
 
@@ -752,7 +752,7 @@ export default function AgentPage() {
                     <option value="urgent">🔴 Urgent — Critical problem</option>
                   </select>
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">CRM Sales Stage</label>
                   <select
@@ -842,7 +842,7 @@ export default function AgentPage() {
                             <p className="text-xs font-bold text-slate-700">{ticket.subject}</p>
                           </div>
                           <div className="text-right">
-                             <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString()}</p>
+                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString()}</p>
                           </div>
                         </div>
                       )) : (
@@ -859,14 +859,14 @@ export default function AgentPage() {
                     <div className="space-y-3">
                       {customerHistory.sessions?.length > 0 ? customerHistory.sessions.map(s => (
                         <div key={s._id} className="p-4 border border-slate-50 rounded-2xl bg-slate-50/50 flex items-center justify-between">
-                           <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-xs">💬</div>
-                              <div>
-                                 <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{s.websiteId?.websiteName}</p>
-                                 <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{s.lastMessagePreview || "No messages"}</p>
-                              </div>
-                           </div>
-                           <span className="text-[8px] font-black text-slate-300">{new Date(s.createdAt).toLocaleDateString()}</span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-xs">💬</div>
+                            <div>
+                              <p className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{s.websiteId?.websiteName}</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[150px]">{s.lastMessagePreview || "No messages"}</p>
+                            </div>
+                          </div>
+                          <span className="text-[8px] font-black text-slate-300">{new Date(s.createdAt).toLocaleDateString()}</span>
                         </div>
                       )) : (
                         <p className="text-[10px] text-slate-400 text-center py-4 font-bold uppercase">No previous chats recorded</p>
@@ -964,7 +964,7 @@ export default function AgentPage() {
               )}
             </div>
             <div className="p-6 border-t border-slate-50 bg-slate-50/50 shrink-0">
-               <button onClick={() => setHistoryModal(false)} className="w-full bg-slate-900 hover:bg-black text-white px-6 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Close Intelligence Tool</button>
+              <button onClick={() => setHistoryModal(false)} className="w-full bg-slate-900 hover:bg-black text-white px-6 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all">Close Intelligence Tool</button>
             </div>
           </div>
         </div>

@@ -34,10 +34,15 @@ const plans = [
   }
 ];
 
-export default function PricingPage({ currentPlan, isExpired }) {
+export default function PricingPage({ currentPlan, isExpired, billingPeriod = "monthly" }) {
   const [loadingPlan, setLoadingPlan] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+
+  const getPrice = (plan) => {
+    const base = parseInt(plan.price.replace("$", ""), 10);
+    return billingPeriod === "annual" ? `$${Math.floor(base * 0.8)}` : plan.price;
+  };
 
   const handleUpgrade = (plan) => {
     setSelectedPlan(plan);
@@ -69,7 +74,13 @@ export default function PricingPage({ currentPlan, isExpired }) {
               </div>
               <div>
                 <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">{plan.name}</h4>
-                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">{plan.price}<span className="text-xs text-slate-400 font-bold ml-1">/mo</span></p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                  {getPrice(plan)}
+                  <span className="text-xs text-slate-400 font-bold ml-1">/mo</span>
+                  {billingPeriod === "annual" && (
+                    <span className="ml-2 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">-20%</span>
+                  )}
+                </p>
               </div>
             </div>
 

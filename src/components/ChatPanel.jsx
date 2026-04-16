@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, API_BASE } from "../api/client.js";
 import { Paperclip, FileText, Check, CheckCheck, Send, Ticket, PlusCircle, UserPlus } from "lucide-react";
 import { cleanString } from "../utils/stringUtils.js";
+import { useToast } from "../context/ToastContext.jsx";
 
 function getDeviceIcon(deviceInfo = "") {
   if (/mobile|android|iphone/i.test(deviceInfo)) return "📱";
@@ -41,7 +42,8 @@ const linkify = (text = "") => {
   });
 };
 
-export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled, onConvertToTicket, onConvertToLead, canUseShortcuts = true }) {
+export default function ChatPanel({ session, messages, onSend, onTyping, isTyping, disabled, onConvertToTicket, onConvertToLead, onIntelClick, canUseShortcuts = true }) {
+  const toast = useToast();
   const [draft, setDraft] = useState("");
   const viewportRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -58,7 +60,9 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
 
   useEffect(() => {
     if (!disabled && canUseShortcuts) {
-      api("/api/canned-responses").then(setShortcuts).catch(() => { });
+      api("/api/canned-responses").then(setShortcuts).catch((error) => {
+        console.error("Failed to load canned responses:", error);
+      });
     }
   }, [disabled, canUseShortcuts]);
 
@@ -133,7 +137,7 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
       onSend({ text: draft || "Sent an attachment", attachmentUrl: data.url, attachmentType: data.attachmentType });
       setDraft("");
     } catch (err) {
-      alert("Failed to upload file: " + err.message);
+      toast.error("Failed to upload file: " + err.message);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -173,8 +177,11 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
       {/* ── Header with Premium Visitor Intel ── */}
       <div className="px-5 md:px-8 py-4 md:py-5 border-b border-slate-50 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl shrink-0 sticky top-0 z-10 transition-colors">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3 lg:gap-4 flex-[1_1_min(100%,400px)] lg:flex-1">
-            <div className={`w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center text-white font-black text-sm shadow-xl shadow-indigo-100 ring-4 ring-white dark:ring-slate-800 select-none`}>
+          <div
+            onClick={onIntelClick}
+            className="flex items-center gap-3 lg:gap-4 flex-[1_1_min(100%,400px)] lg:flex-1 cursor-pointer group hover:bg-slate-50 dark:hover:bg-white/5 p-2 rounded-2xl transition-all"
+          >
+            <div className={`w-12 h-12 rounded-2xl ${avatarColor} flex items-center justify-center text-white font-black text-sm shadow-xl shadow-indigo-100 ring-4 ring-white dark:ring-slate-800 select-none group-hover:scale-105 transition-transform`}>
               {getInitials(visitorName)}
             </div>
             <div className="flex-1 min-w-0">
@@ -259,8 +266,8 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
               </button>
             ) : null}
             <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm border ${session.status === "queued"
-                ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20"
-                : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20"
+              ? "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20"
+              : "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20"
               }`}>
               {session.status}
             </span>
@@ -279,8 +286,8 @@ export default function ChatPanel({ session, messages, onSend, onTyping, isTypin
             <div key={msg._id || i} className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-4 duration-500`}>
               <div className={`max-w-[80%] group flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                 <div className={`px-5 py-3.5 rounded-2xl text-sm font-medium shadow-sm transition-all hover:shadow-md ${isMe
-                    ? "bg-slate-900 dark:bg-indigo-600 text-white rounded-tr-none"
-                    : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-white/5 rounded-tl-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  ? "bg-slate-900 dark:bg-indigo-600 text-white rounded-tr-none"
+                  : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-white/5 rounded-tl-none shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
                   }`}>
                   {msg.attachmentUrl ? (
                     <div className="space-y-3">

@@ -126,11 +126,17 @@ export default function BillingPage() {
                )}
             </div>
             
-            {!isExpired && (
-               <div className="mt-8 p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest text-center">Standard maintenance inclusive • Pro-rata billing active</p>
-               </div>
-            )}
+          {!isExpired && (
+             <div className="mt-8 flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Standard maintenance inclusive • Pro-rata billing active</p>
+                <button
+                  onClick={handlePortal}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/10 border border-slate-200 dark:border-white/10 text-[9px] font-black uppercase tracking-widest text-slate-700 dark:text-white hover:bg-slate-50 transition-all shadow-sm"
+                >
+                  <ExternalLink size={12} /> Manage Billing
+                </button>
+             </div>
+          )}
          </div>
       </div>
 

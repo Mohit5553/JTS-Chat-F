@@ -6,6 +6,7 @@ import AgentPage from "./pages/AgentPage.jsx";
 import TicketStatusPage from "./pages/TicketStatusPage.jsx";
 import ManagerPage from "./pages/ManagerPage.jsx";
 import SalesPage from "./pages/SalesPage.jsx";
+import SessionWarningModal from "./components/SessionWarningModal.jsx";
 
 function destinationForRole(role) {
   if (["agent", "user"].includes(role)) return "/agent";
@@ -35,18 +36,26 @@ function ProtectedRoute({ children, allowedRoles }) {
 
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, sessionWarning, extendSession, logout } = useAuth();
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/ticket-status/:ticketId" element={<TicketStatusPage />} />
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><ClientPage /></ProtectedRoute>} />
-      <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerPage /></ProtectedRoute>} />
-      <Route path="/client" element={<ProtectedRoute allowedRoles={["client"]}><ClientPage /></ProtectedRoute>} />
-      <Route path="/sales" element={<ProtectedRoute allowedRoles={["sales"]}><SalesPage /></ProtectedRoute>} />
-      <Route path="/agent" element={<ProtectedRoute allowedRoles={["agent", "user"]}><AgentPage /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to={user ? destinationForRole(user.role) : "/login"} replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/ticket-status/:ticketId" element={<TicketStatusPage />} />
+        <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><ClientPage /></ProtectedRoute>} />
+        <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerPage /></ProtectedRoute>} />
+        <Route path="/client" element={<ProtectedRoute allowedRoles={["client"]}><ClientPage /></ProtectedRoute>} />
+        <Route path="/sales" element={<ProtectedRoute allowedRoles={["sales"]}><SalesPage /></ProtectedRoute>} />
+        <Route path="/agent" element={<ProtectedRoute allowedRoles={["agent", "user"]}><AgentPage /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to={user ? destinationForRole(user.role) : "/login"} replace />} />
+      </Routes>
+
+      <SessionWarningModal
+        open={sessionWarning}
+        onExtend={extendSession}
+        onLogout={logout}
+      />
+    </>
   );
 }

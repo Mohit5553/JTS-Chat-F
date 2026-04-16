@@ -16,8 +16,12 @@ export default function SecurityCenter() {
   const [deliveryPage, setDeliveryPage] = useState(1);
 
   useEffect(() => {
-    api("/api/audit-logs").then(setAuditLogs).catch(() => {});
-    api("/api/webhooks/deliveries").then(setWebhookDeliveries).catch(() => {});
+    api("/api/audit-logs").then(setAuditLogs).catch((error) => {
+      console.error("Failed to load audit logs:", error);
+    });
+    api("/api/webhooks/deliveries").then(setWebhookDeliveries).catch((error) => {
+      console.error("Failed to load webhook deliveries:", error);
+    });
   }, []);
 
   async function startSetup() {

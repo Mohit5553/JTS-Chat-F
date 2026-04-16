@@ -1,13 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, MessageSquare, Clock, Globe, Shield, ChevronRight } from "lucide-react";
+import { Search, MessageSquare, Clock, Globe, Shield, ChevronRight, Check, Trash2, UserCheck } from "lucide-react";
 import ChatPanel from "./ChatPanel.jsx";
 import TicketConversionModal from "./TicketConversionModal.jsx";
+import SessionList from "./ConversationSystem/SessionList.jsx";
+import ConversationDrawer from "./ConversationSystem/ConversationDrawer.jsx";
 import { api } from "../api/client.js";
 import { useToast } from "../context/ToastContext.jsx";
 import { cleanString } from "../utils/stringUtils.js";
 
-export default function ConversationHub({ socket, initialSessions = [], websiteId }) {
+export default function ConversationHub({ socket, initialSessions = [], websiteId, userRole = "agent", extraHeader = null }) {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [sessions, setSessions] = useState(initialSessions);
@@ -17,6 +19,11 @@ export default function ConversationHub({ socket, initialSessions = [], websiteI
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [sessionToConvert, setSessionToConvert] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
+  // -- Bulk Selection State --
+  const [selectedIds, setSelectedIds] = useState([]);
+  
   const activeRequestRef = useRef("");
 
   const selectedSession = useMemo(() =>
@@ -130,134 +137,147 @@ export default function ConversationHub({ socket, initialSessions = [], websiteI
     });
   };
 
-  const filteredSessions = sessions.filter(s => {
-    const matchesWebsite = !websiteId || (s.websiteId?._id === websiteId || s.websiteId === websiteId);
-    const matchesSearch = !searchTerm ||
-      s.websiteId?.websiteName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.visitorId?.visitorId?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesWebsite && matchesSearch;
-  });
+  const handleBulkClose = async () => {
+    if (!window.confirm(`Close ${selectedIds.length} sessions?`)) return;
+    try {
+      await api("/api/chat/bulk-close", { method: "POST", body: { sessionIds: selectedIds } });
+      toast.success(`Closed ${selectedIds.length} sessions`);
+      setSelectedIds([]);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Permanently DELETE ${selectedIds.length} sessions? This cannot be undone.`)) return;
+    try {
+      await api("/api/chat/bulk-delete", { method: "POST", body: { sessionIds: selectedIds } });
+      toast.success(`Deleted ${selectedIds.length} sessions`);
+      setSelectedIds([]);
+      // Force refresh sessions via parent or reload
+      window.location.reload(); 
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const toggleSelection = (sessionId) => {
+    setSelectedIds(prev => 
+      prev.includes(sessionId) ? prev.filter(id => id !== sessionId) : [...prev, sessionId]
+    );
+  };
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(s => {
+      const matchesWebsite = !websiteId || (s.websiteId?._id === websiteId || s.websiteId === websiteId);
+      const matchesSearch = !searchTerm ||
+        s.visitorId?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.visitorId?.visitorId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.lastMessagePreview?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesWebsite && matchesSearch;
+    });
+  }, [sessions, websiteId, searchTerm]);
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-[calc(100vh-180px)] min-h-[600px] animate-in slide-in-from-bottom-4 duration-700">
-      {/* Session Sidebar */}
-      <div className="lg:col-span-4 premium-card p-0 flex flex-col border-none shadow-2xl bg-white dark:bg-slate-900 overflow-hidden transition-colors">
-        <div className="p-8 border-b border-slate-50 dark:border-white/5 space-y-5 bg-slate-50/20 dark:bg-black/10">
-          <div className="flex flex-col gap-1.5">
-            <h3 className="heading-md dark:text-white">Active Streams</h3>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.2em]">{sessions.length} Live Connections</span>
-            </div>
-          </div>
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={14} />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Filter frequency spectrum..."
-              className="w-full bg-white dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-xl pl-10 pr-4 py-3.5 text-[11px] font-black focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500/50 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-800 dark:text-white uppercase tracking-wider"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/10 dark:bg-black/5 custom-scrollbar">
-          {filteredSessions.map(session => (
-            <div
-              key={session._id}
-              onClick={() => {
-                const params = new URLSearchParams(searchParams);
-                params.set("sessionId", session.sessionId);
-                setSearchParams(params);
-              }}
-              className={`p-5 rounded-[24px] border transition-all duration-500 cursor-pointer relative overflow-hidden group ${selectedSessionId === session.sessionId
-                  ? "bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-500/30 shadow-2xl translate-x-1"
-                  : "bg-white/50 dark:bg-white/5 border-slate-50 dark:border-white/5 hover:border-slate-200 dark:hover:border-white/10"
-                }`}
-            >
-              <div className="relative z-10 space-y-3">
-                <div className="flex items-center justify-between">
-                  <strong className={`text-[10px] font-black tracking-[0.15em] block uppercase transition-colors shrink-0 ${selectedSessionId === session.sessionId ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-slate-200'}`}>
-                    {session.websiteId?.websiteName || 'Global Source'}
-                  </strong>
-                  <div className="flex items-center gap-2">
-                    {session.unreadCount > 0 ? (
-                      <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[8px] font-black text-white">{session.unreadCount}</span>
-                    ) : null}
-                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-md ${selectedSessionId === session.sessionId ? 'bg-indigo-600 text-white' : 'text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-white/5'}`}>
-                      {new Date(session.updatedAt || session.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] transition-all ${selectedSessionId === session.sessionId ? 'bg-indigo-600 text-white shadow-lg rotate-3' : 'bg-slate-100 dark:bg-white/5 text-slate-400'}`}>
-                    {(cleanString(session.visitorId?.name) || cleanString(session.visitorId?.visitorId) || 'AN').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[10px] text-slate-900 dark:text-slate-300 font-black tracking-widest uppercase truncate block">
-                      {cleanString(session.visitorId?.name) || cleanString(session.visitorId?.visitorId, 'Anonymous User')}
-                    </span>
-                    {session.lastMessagePreview ? (
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-1 opacity-80 font-bold mt-0.5">
-                        {session.lastMessagePreview}
-                      </p>
-                    ) : (
-                      <span className="text-[9px] text-slate-300 dark:text-slate-700 font-bold uppercase tracking-widest">Waiting for signal...</span>
-                    )}
-                    {session.currentPage ? (
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-300 dark:text-slate-700">
-                        {session.currentPage}
-                      </p>
-                    ) : null}
-                  </div>
-                  <ChevronRight size={14} className={`text-slate-200 dark:text-slate-800 group-hover:text-indigo-500 transition-colors ${selectedSessionId === session.sessionId ? 'opacity-0' : ''}`} />
-                </div>
-              </div>
-              {selectedSessionId === session.sessionId && (
-                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-600 dark:bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]" />
-              )}
-            </div>
-          ))}
-          {filteredSessions.length === 0 && (
-            <div className="text-center py-24 text-slate-300 dark:text-slate-800 flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-500">
-              <div className="w-16 h-16 rounded-3xl bg-slate-50 dark:bg-white/5 flex items-center justify-center shadow-inner">
-                <MessageSquare size={32} strokeWidth={1.5} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-600">Zero active transmissions</p>
-                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-800">Stand by for incoming signals...</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chat Area */}
-      <div className="lg:col-span-8 h-full bg-white dark:bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl border border-slate-50 dark:border-white/5">
-        <ChatPanel
-          session={selectedSession}
-          messages={messages}
-          onSend={handleSend}
-          onTyping={(isTyping) => socket?.emit("agent:typing", { sessionId: selectedSessionId, isTyping })}
-          canUseShortcuts={true}
-          onConvertToTicket={(s) => {
-            setSessionToConvert(s);
-            setShowTicketModal(true);
+    <section className="relative h-[calc(100vh-180px)] min-h-[600px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full animate-in slide-in-from-bottom-4 duration-700">
+        
+        {/* Session List Component */}
+        <SessionList 
+          sessions={filteredSessions}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          selectedSessionId={selectedSessionId}
+          onSelectSession={(id) => {
+            const params = new URLSearchParams(searchParams);
+            params.set("sessionId", id);
+            setSearchParams(params);
           }}
+          selectedIds={selectedIds}
+          toggleSelection={toggleSelection}
+          extraHeader={extraHeader}
         />
+
+        <div className="lg:col-span-8 h-full relative">
+          <ChatPanel
+            session={selectedSession}
+            messages={messages}
+            onSend={handleSend}
+            onTyping={(isTyping) => socket.emit("agent_typing", { sessionId: selectedSessionId, isTyping })}
+            onConvertToTicket={(s) => {
+              setSessionToConvert(s);
+              setShowTicketModal(true);
+            }}
+            onIntelClick={() => setIsDrawerOpen(true)}
+            onConvertToLead={() => setIsDrawerOpen(true)} 
+          />
+        </div>
       </div>
 
-      {showTicketModal && sessionToConvert && (
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-[32px] shadow-2xl flex items-center gap-10 z-50 animate-in slide-in-from-bottom-10 duration-500 border border-white/10 backdrop-blur-xl">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">{selectedIds.length} Selected</span>
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.2em]">Omni-Channel Operations</span>
+          </div>
+          <div className="h-8 w-px bg-white/10" />
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={handleBulkClose}
+              className="px-5 py-2.5 bg-white/5 hover:bg-emerald-600 transition-all rounded-2xl flex items-center gap-2 group"
+            >
+              <UserCheck size={16} className="group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Bulk Close</span>
+            </button>
+            {["admin", "client", "manager"].includes(userRole) && (
+              <button 
+                onClick={handleBulkDelete}
+                className="px-5 py-2.5 bg-white/5 hover:bg-rose-600 transition-all rounded-2xl flex items-center gap-2 group text-rose-400 hover:text-white"
+              >
+                <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Bulk Delete</span>
+              </button>
+            )}
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="text-[10px] font-black text-slate-500 hover:text-white uppercase tracking-widest px-4 py-2 hover:bg-white/5 rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Intelligence & Governance Drawer */}
+      <ConversationDrawer 
+        session={selectedSession}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onConvertToTicket={(s) => {
+          setSessionToConvert(s);
+          setShowTicketModal(true);
+        }}
+        onDeleteSession={async (id) => {
+          if (!window.confirm("Permanently delete this session?")) return;
+          try {
+            await api(`/api/chat/sessions/${id}`, { method: "DELETE" });
+            toast.success("Session deleted");
+            setIsDrawerOpen(false);
+            window.location.reload();
+          } catch (err) {
+            toast.error(err.message);
+          }
+        }}
+      />
+
+      {showTicketModal && (
         <TicketConversionModal
           session={sessionToConvert}
-          onClose={() => {
-            setShowTicketModal(false);
-            setSessionToConvert(null);
-          }}
+          onClose={() => setShowTicketModal(false)}
           onSuccess={() => {
             setShowTicketModal(false);
-            setSessionToConvert(null);
-            toast.success("Ticket created successfully! View it in the Tickets tab.");
+            toast.success("Ticket created successfully");
           }}
         />
       )}

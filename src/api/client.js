@@ -21,11 +21,19 @@ export async function api(path, options = {}) {
     headers
   });
 
-  const data = await response.json().catch(() => ({}));
+  const data = await response.json().catch((error) => {
+    console.error("Failed to parse JSON response:", error);
+    return {};
+  });
   if (response.status === 401) {
-    localStorage.removeItem("dashboard_token");
-    window.location.href = "/login";
-    throw new Error("Session expired. Please log in again.");
+    const isAuthPath = path.includes("/api/auth/login") || path.includes("/api/auth/register");
+    const isAlreadyOnLogin = window.location.pathname === "/login";
+
+    if (!isAuthPath && !isAlreadyOnLogin) {
+      localStorage.removeItem("dashboard_token");
+      window.location.href = "/login";
+    }
+    throw new Error(data.message || "Session expired. Please log in again.");
   }
 
   if (!response.ok) {
@@ -34,5 +42,11 @@ export async function api(path, options = {}) {
 
   return data;
 }
+
+// Add familiar helper methods to prevent crashes in legacy/external components
+api.get = (path, options = {}) => api(path, { ...options, method: "GET" });
+api.post = (path, body, options = {}) => api(path, { ...options, method: "POST", body: JSON.stringify(body) });
+api.patch = (path, body, options = {}) => api(path, { ...options, method: "PATCH", body: JSON.stringify(body) });
+api.delete = (path, options = {}) => api(path, { ...options, method: "DELETE" });
 
 export { API_BASE };

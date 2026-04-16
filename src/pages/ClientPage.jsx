@@ -18,6 +18,7 @@ import TicketManager from "../components/TicketManager.jsx";
 import ConversationHistory from "../components/ConversationHistory.jsx";
 import CannedResponseManager from "../components/CannedResponseManager.jsx";
 import CategoryManager from "../components/CategoryManager.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 import DepartmentManager from "../components/DepartmentManager.jsx";
 import CRMManager from "../components/CRMManager.jsx";
 import SecurityCenter from "../components/SecurityCenter.jsx";
@@ -293,6 +294,7 @@ const ClientOverview = ({ analytics, queuedSessions, isExpired, stripeCustomerId
 
 export default function ClientPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const canUseTickets = user?.role === "admin" || hasModule(user, "tickets");
   const canUseCRM = user?.role === "admin" || hasModule(user, "crm");
   const canUseReports = user?.role === "admin" || hasModule(user, "reports");
@@ -355,6 +357,7 @@ export default function ClientPage() {
 
     socket.on("connect_error", (err) => {
       console.error("[Socket] Connection error:", err.message);
+      toast.error("Connection to server lost. Some features may not work properly.");
     });
 
     const handleSessionUpdate = () => fetchInitial();
