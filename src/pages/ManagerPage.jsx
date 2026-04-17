@@ -11,6 +11,7 @@ import { getPaginationMeta } from "../utils/pagination.js";
 import { api } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { hasModule } from "../utils/planAccess.js";
+import ManagerCrmReports from "../components/ManagerCrmReports.jsx";
 
 export default function ManagerPage() {
   const { user } = useAuth();
@@ -331,24 +332,28 @@ export default function ManagerPage() {
         title="Reports"
         subtitle="Team performance and analytics"
       >
-        <section className="premium-card p-0 overflow-hidden animate-in slide-in-from-bottom-4 duration-700">
-          <div className="p-8 border-b border-slate-50 bg-slate-50/30">
-            <h3 className="heading-md">Performance Dashboard</h3>
-            <p className="small-label opacity-60 mt-1">Key metrics for your supervised team</p>
-          </div>
-          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-               <p className="text-[10px] font-black tracking-widest uppercase">Analytics Data</p>
-               <p className="text-3xl font-black text-indigo-200">{analytics?.totals?.customers || 0}</p>
-               <p className="text-[9px] font-black uppercase text-slate-400">Total Leads Handled</p>
+        <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-700">
+          <section className="premium-card p-0 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+              <h3 className="heading-md">Performance Snapshot</h3>
+              <p className="small-label opacity-60 mt-1">Key metrics for your supervised team</p>
             </div>
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-               <p className="text-[10px] font-black tracking-widest uppercase">Resolution Rate</p>
-               <p className="text-3xl font-black text-emerald-200">{agents.length > 0 ? "84%" : "0%"}</p>
-               <p className="text-[9px] font-black uppercase text-slate-400">Average team rating</p>
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                <p className="text-[10px] font-black tracking-widest uppercase">Analytics Data</p>
+                <p className="text-3xl font-black text-indigo-200">{analytics?.totals?.customers || 0}</p>
+                <p className="text-[9px] font-black uppercase text-slate-400">Total Leads Handled</p>
+              </div>
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                <p className="text-[10px] font-black tracking-widest uppercase">Resolution Rate</p>
+                <p className="text-3xl font-black text-emerald-200">{agents.length > 0 ? "84%" : "0%"}</p>
+                <p className="text-[9px] font-black uppercase text-slate-400">Average team rating</p>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <ManagerCrmReports websites={websites} />
+        </div>
       </Layout>
     );
   }

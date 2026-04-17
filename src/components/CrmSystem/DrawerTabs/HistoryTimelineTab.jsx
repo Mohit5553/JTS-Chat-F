@@ -10,7 +10,8 @@ export default function HistoryTimelineTab({ entityId }) {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await api(`/api/audit?entityId=${entityId}`);
+        // Backend exposes audit logs at /api/audit-logs
+        const data = await api(`/api/audit-logs?entityId=${entityId}`);
         setLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("Failed to fetch history logs:", err);
