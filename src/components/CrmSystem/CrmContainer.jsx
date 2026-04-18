@@ -428,37 +428,39 @@ export default function CrmContainer({
   };
 
   const onBulkUpdate = async (updates) => {
-    if (selectedIds.length === 0) return;
+    if (!selectedIds.length) return;
     try {
       const res = await api("/api/crm/bulk-update", {
         method: "PATCH",
         body: JSON.stringify({ ids: selectedIds, updates })
       });
-      setActionMessage({ type: "success", text: `Bulk update complete: ${res.results.updated} updated.` });
+      setActionMessage({ type: "success", text: `Successfully updated ${res.count} leads.` });
       setSelectedIds([]);
       fetchCustomers();
     } catch (err) {
-      setActionMessage({ type: "error", text: "Bulk update failed." });
+      setActionMessage({ type: "error", text: "Bulk update failed: " + err.message });
     }
   };
 
   const onBulkDelete = async () => {
-    if (selectedIds.length === 0 || !window.confirm(`Delete ${selectedIds.length} records permanently?`)) return;
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} leads? This action cannot be undone.`)) return;
+
     try {
       const res = await api("/api/crm/bulk-delete", {
-        method: "POST",
+        method: "DELETE",
         body: JSON.stringify({ ids: selectedIds })
       });
-      setActionMessage({ type: "success", text: `Bulk delete complete: ${res.results.deleted} deleted.` });
+      setActionMessage({ type: "success", text: `Successfully deleted ${res.count} leads.` });
       setSelectedIds([]);
       fetchCustomers();
     } catch (err) {
-      setActionMessage({ type: "error", text: "Bulk delete failed." });
+      setActionMessage({ type: "error", text: "Bulk delete failed: " + err.message });
     }
   };
 
   const toggleSelection = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const clearSelection = () => setSelectedIds([]);
@@ -527,6 +529,8 @@ export default function CrmContainer({
       setSendingEmail(false);
     }
   };
+
+
 
   const onGenerateCode = async (customerId) => {
     if (!customerId) return;

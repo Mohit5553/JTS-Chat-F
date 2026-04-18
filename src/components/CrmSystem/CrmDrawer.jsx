@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useSocket } from "../../context/SocketContext.jsx";
 import { createPortal } from "react-dom";
 import {
   X, PlusCircle, Mail, Ticket as TicketIcon, MessageCircle,
@@ -61,6 +62,48 @@ export default function CrmDrawer({
   onGenerateCode,
   teamMembers
 }) {
+  const socket = useSocket();
+  const [othersViewing, setOthersViewing] = useState([]);
+
+  useEffect(() => {
+    if (!socket || !showDrawer || !selectedCustomer?._id) return;
+
+    const leadId = selectedCustomer._id;
+    
+    // Emit viewing status
+    socket.emit("crm:viewing-lead", { leadId, isViewing: true });
+
+    // Listen for presence updates
+    const handlePresence = ({ leadId: incomingId, user, isViewing }) => {
+      if (incomingId !== leadId) return;
+      setOthersViewing(prev => {
+        if (isViewing) {
+          // Avoid duplicates
+          if (prev.find(u => u._id === user._id)) return prev;
+          return [...prev, user];
+        } else {
+          return prev.filter(u => u._id !== user._id);
+        }
+      });
+    };
+
+    const handleSync = ({ leadId: incomingId, others }) => {
+      if (incomingId === leadId) {
+        setOthersViewing(others);
+      }
+    };
+
+    socket.on("crm:lead-presence", handlePresence);
+    socket.on("crm:lead-presence-sync", handleSync);
+
+    return () => {
+      socket.emit("crm:viewing-lead", { leadId, isViewing: false });
+      socket.off("crm:lead-presence", handlePresence);
+      socket.off("crm:lead-presence-sync", handleSync);
+      setOthersViewing([]);
+    };
+  }, [socket, showDrawer, selectedCustomer?._id]);
+
   if (!showDrawer) return null;
 
   return createPortal(
@@ -103,7 +146,24 @@ export default function CrmDrawer({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-4 shrink-0">
+            {othersViewing.length > 0 && (
+              <div className="flex items-center -space-x-2 mr-2">
+                {othersViewing.map((u) => (
+                  <div 
+                    key={u._id}
+                    title={`${u.name} is also viewing`}
+                    className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black border-2 border-white shadow-sm animate-in zoom-in-50 duration-300"
+                  >
+                    {u.name?.[0]?.toUpperCase()}
+                  </div>
+                ))}
+                <div className="pl-3 text-[9px] font-black text-indigo-500 uppercase tracking-widest animate-pulse">
+                  Viewing Now
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
             {canAssignOwners && onAutoAssign && (
               <button
                 onClick={() => onAutoAssign(selectedCustomer)}
@@ -148,12 +208,13 @@ export default function CrmDrawer({
             </button>
           </div>
         </div>
+      </div>
 
         {/* Scrollable Context Wrapper */}
         <div className="flex-1 overflow-y-auto bg-slate-50/40 custom-scrollbar">
           {/* Quick Stats Banner */}
-          <div className="px-5 py-4 md:px-8 border-b border-slate-100 bg-white grid grid-cols-3 md:grid-cols-6 gap-4 sticky top-0 z-[11]">
-            <div className="space-y-1">
+          <div className="px-5 py-4 md:px-8 border-b border-slate-100 bg-white flex flex-wrap items-start gap-x-8 gap-y-4 sticky top-0 z-[11] shadow-sm">
+            <div className="space-y-1 min-w-[120px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pipeline Stage</p>
               <div className="flex items-center gap-2">
                 <CRMStageBadge stage={selectedCustomer?.pipelineStage} />
@@ -164,32 +225,18 @@ export default function CrmDrawer({
                 )}
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Actions</p>
-              {selectedCustomer?.pipelineStage === "won" && !selectedCustomer?.isLocked ? (
-                <button
-                  onClick={() => onGenerateCode(selectedCustomer._id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-                >
-                  <Zap size={10} className="fill-white" /> Generate Code
-                </button>
-              ) : selectedCustomer?.isLocked ? (
-                <div className="text-[9px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                  {selectedCustomer.generatedCode}
-                </div>
-              ) : (
-                <p className="text-xs font-black text-slate-900">{formatCurrency(selectedCustomer?.leadValue)}</p>
-              )}
-            </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 min-w-[100px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Est. Value</p>
               <p className="text-xs font-black text-slate-900">{formatCurrency(selectedCustomer?.leadValue)}</p>
             </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 min-w-[100px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Budget</p>
               <p className="text-xs font-black text-indigo-600">{formatCurrency(selectedCustomer?.budget)}</p>
             </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 min-w-[80px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Prob.</p>
               <div className="flex items-center gap-1.5">
                 <div className="h-1.5 w-8 bg-slate-100 rounded-full overflow-hidden">
@@ -198,16 +245,36 @@ export default function CrmDrawer({
                 <span className="text-[10px] font-black text-indigo-600">{selectedCustomer?.probability || 0}%</span>
               </div>
             </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 min-w-[100px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Exp. Close</p>
               <p className="text-xs font-black text-slate-900 truncate">
                 {selectedCustomer?.expectedCloseDate ? new Date(selectedCustomer.expectedCloseDate).toLocaleDateString() : "TBD"}
               </p>
             </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 min-w-[120px]">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Decision Maker</p>
               <p className="text-xs font-black text-slate-900 truncate">{selectedCustomer?.decisionMaker || "Unknown"}</p>
             </div>
+
+            {(selectedCustomer?.pipelineStage === "won" || selectedCustomer?.isLocked) && (
+              <div className="space-y-1 min-w-[140px] border-l border-slate-100 pl-8 ml-auto">
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Special Actions</p>
+                {selectedCustomer?.pipelineStage === "won" && !selectedCustomer?.isLocked ? (
+                  <button
+                    onClick={() => onGenerateCode(selectedCustomer._id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                  >
+                    <Zap size={10} className="fill-white" /> Generate Code
+                  </button>
+                ) : (
+                  <div className="text-[9px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 inline-block">
+                    Code: <span className="font-black text-indigo-600 ml-1">{selectedCustomer.generatedCode}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tab Navigation */}

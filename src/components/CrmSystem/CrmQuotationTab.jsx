@@ -109,7 +109,35 @@ export default function CRMQuotationTab({ customer, websiteId }) {
             {showCreate && (
                 <div className="bg-white rounded-2xl border-2 border-indigo-100 p-5 shadow-xl animate-in fade-in slide-in-from-top-4">
                     <form onSubmit={handleCreate} className="space-y-4">
-                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Quote Construction</p>
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Quote Construction</p>
+                            <div className="flex gap-2">
+                                {[
+                                    { 
+                                        label: "SaaS Template", 
+                                        items: [
+                                            { description: "Monthly SaaS Subscription", quantity: 1, price: 4999, total: 4999 },
+                                            { description: "One-time Setup Fee", quantity: 1, price: 1999, total: 1999 }
+                                        ] 
+                                    },
+                                    { 
+                                        label: "Consulting", 
+                                        items: [
+                                            { description: "Hourly Consulting Services", quantity: 10, price: 1500, total: 15000 }
+                                        ] 
+                                    }
+                                ].map(template => (
+                                    <button
+                                        key={template.label}
+                                        type="button"
+                                        onClick={() => setForm({ ...form, items: template.items })}
+                                        className="px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-[8px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all"
+                                    >
+                                        Use {template.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         {form.items.map((item, idx) => (
                             <div key={idx} className="grid grid-cols-12 gap-2 items-center">
                                 <div className="col-span-6">

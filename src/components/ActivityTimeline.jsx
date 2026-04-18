@@ -97,6 +97,22 @@ function renderMetadata(metadata) {
 }
 
 export default function ActivityTimeline({ items = [], emptyLabel = "No timeline activity yet." }) {
+  const [filter, setFilter] = useState("all");
+
+  const categories = [
+    { id: "all", label: "All history", icon: null },
+    { id: "interactions", label: "Interactions", types: ["note_added", "call_logged", "meeting_logged", "manual_email_logged", "email_sent", "comment_added"] },
+    { id: "tasks", label: "Tasks", types: ["task_created", "task_updated", "task_completed"] },
+    { id: "system", label: "Lifecycle", types: ["created", "updated", "archived", "restored", "assigned", "transferred", "status_changed", "duplicate_detected", "merged"] },
+    { id: "web", label: "Web activity", types: ["page_view"] }
+  ];
+
+  const filteredItems = items.filter(item => {
+    if (filter === "all") return true;
+    const cat = categories.find(c => c.id === filter);
+    return cat?.types?.includes(item.type);
+  });
+
   if (!items.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center">
@@ -106,26 +122,48 @@ export default function ActivityTimeline({ items = [], emptyLabel = "No timeline
   }
 
   return (
-    <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
-      {items.map((item, index) => (
-        <div key={item._id || `${item.type}-${index}`} className="relative flex gap-5">
-          <div className={`relative z-10 mt-1 h-6 w-6 shrink-0 rounded-full border-4 border-white ${TYPE_STYLES[item.type] || "bg-slate-400"}`} />
-          <div className="flex-1 rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-black text-slate-900">{item.summary || item.title || item.type}</p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  {(item.actorName || "System")} {item.actorRole ? `• ${item.actorRole}` : ""}
-                </p>
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-100">
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setFilter(cat.id)}
+            className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+              filter === cat.id 
+                ? "bg-slate-900 text-white shadow-md" 
+                : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-slate-100 animate-in fade-in duration-300" key={filter}>
+        {filteredItems.length > 0 ? filteredItems.map((item, index) => (
+          <div key={item._id || `${item.type}-${index}`} className="relative flex gap-5">
+            <div className={`relative z-10 mt-1 h-6 w-6 shrink-0 rounded-full border-4 border-white ${TYPE_STYLES[item.type] || "bg-slate-400"}`} />
+            <div className="flex-1 rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-sm hover:border-slate-200 transition-colors">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-black text-slate-900">{item.summary || item.title || item.type}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    {(item.actorName || "System")} {item.actorRole ? `• ${item.actorRole}` : ""}
+                  </p>
+                </div>
+                <span className="text-[9px] font-bold uppercase text-slate-300">
+                  {new Date(item.createdAt).toLocaleString()}
+                </span>
               </div>
-              <span className="text-[9px] font-bold uppercase text-slate-300">
-                {new Date(item.createdAt).toLocaleString()}
-              </span>
+              {item.metadata ? renderMetadata(item.metadata) : null}
             </div>
-            {item.metadata ? renderMetadata(item.metadata) : null}
           </div>
-        </div>
-      ))}
+        )) : (
+          <div className="py-12 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-200">No activity in this category</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

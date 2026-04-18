@@ -5,10 +5,11 @@ import {
   LayoutDashboard, Users, Globe, Headphones,
   MessageSquare, BarChart, ChevronLeft, ChevronRight, LogOut,
   Sun, Moon, Bell, Ticket, AlertCircle, Clock, Menu, X,
-  Contact, CreditCard, ShieldCheck, ExternalLink
+  Contact, CreditCard, ShieldCheck, ExternalLink, Search, Command
 } from "lucide-react";
 import { api } from "../api/client.js";
 import { useSocket } from "../context/SocketContext.jsx";
+import GlobalSearch from "./CrmSystem/GlobalSearch.jsx";
 
 /* ── helpers ──────────────────────────────────────── */
 function getInitials(name = "") {
@@ -281,6 +282,7 @@ export default function Layout({ title, subtitle, children, menuItems = [] }) {
 
   return (
     <div className="flex h-screen bg-[var(--bg-main)] text-slate-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
+      <GlobalSearch />
 
       {/* ── Mobile Overlay ─────────────────────────── */}
       {mobileOpen && (
@@ -397,6 +399,17 @@ export default function Layout({ title, subtitle, children, menuItems = [] }) {
               aria-label="Open menu"
             >
               <Menu size={20} />
+            </button>
+
+            <button
+               onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', {'key': 'k', 'ctrlKey': true}))}
+               className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 transition-all shrink-0"
+            >
+              <Search size={14} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Search</span>
+              <div className="flex items-center gap-0.5 ml-2 px-1.5 py-0.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded text-[8px] font-black text-slate-400">
+                <Command size={8} /> K
+              </div>
             </button>
 
             <div className="min-w-0">
