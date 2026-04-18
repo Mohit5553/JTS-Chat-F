@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronRight, User, AlertTriangle, TrendingUp, Brain, Clock } from "lucide-react";
+import { ChevronRight, User, AlertTriangle, TrendingUp, Brain, Clock, Shield } from "lucide-react";
 import {
   WinProbabilityBadge,
   HeatIndicator,
@@ -22,6 +22,7 @@ export default function CrmBoardView({
   canManagePipeline,
   onOpenCustomer,
   onBoardDrop,
+  onGenerateCode,
   draggedCustomerId,
   setDraggedCustomerId,
   dropTargetStatus,
@@ -109,8 +110,9 @@ function BoardCard({ customer, canManagePipeline, onOpenCustomer, draggedCustome
 
   return (
     <article
-      draggable={canManagePipeline}
+      draggable={canManagePipeline && !customer.isLocked}
       onDragStart={(e) => {
+        if (customer.isLocked) return;
         setDraggedCustomerId(customer._id);
         e.dataTransfer.setData("customerId", customer._id);
         e.dataTransfer.effectAllowed = "move";
@@ -132,10 +134,15 @@ function BoardCard({ customer, canManagePipeline, onOpenCustomer, draggedCustome
       onClick={() => onOpenCustomer(customer)}
       className={`rounded-[22px] border bg-white p-4 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer group relative ${draggedCustomerId === customer._id ? "border-indigo-300 opacity-70 scale-[0.98]" : "border-slate-200"} ${isStale ? "ring-2 ring-amber-400/30 ring-offset-2 animate-pulse-subtle bg-amber-50/10" : ""}`}
     >
-      {customer.pipelineStage === "won" && (
+      {customer.pipelineStage === "won" && !customer.isLocked && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 text-slate-900 text-[9px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-[0_8px_20px_-4px_rgba(234,179,8,0.4)] z-20 flex items-center gap-2 border border-yellow-200 overflow-hidden group/badge">
           <div className="absolute inset-0 animate-shimmer pointer-events-none" />
           <span className="relative z-10 flex items-center gap-2">🏆 DEAL WON ✨</span>
+        </div>
+      )}
+      {customer.isLocked && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-full shadow-lg z-20 flex items-center gap-2 border border-slate-700 overflow-hidden">
+          <Shield size={10} className="fill-amber-400 text-amber-400" /> LOCKED
         </div>
       )}
       {customer.nbaMetadata && (

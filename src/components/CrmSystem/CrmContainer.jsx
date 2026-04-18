@@ -528,6 +528,17 @@ export default function CrmContainer({
     }
   };
 
+  const onGenerateCode = async (customerId) => {
+    if (!customerId) return;
+    try {
+      const updated = await api(`/api/crm/${customerId}/generate-code`, { method: "POST" });
+      syncCustomerState(updated);
+      setActionMessage({ type: "success", text: "Lead locked and code generated." });
+    } catch (err) {
+      setActionMessage({ type: "error", text: "Code generation failed." });
+    }
+  };
+
   // -- Modal Handlers --
   const openCreateModal = (initData = {}) => {
     setEditLeadId(null);
@@ -800,6 +811,7 @@ export default function CrmContainer({
           canManagePipeline={canManagePipeline}
           onOpenCustomer={openCustomer}
           onBoardDrop={handleBoardDrop}
+          onGenerateCode={onGenerateCode}
           draggedCustomerId={draggedCustomerId}
           setDraggedCustomerId={setDraggedCustomerId}
           dropTargetStatus={dropTargetStatus}
@@ -868,6 +880,7 @@ export default function CrmContainer({
         setEmailDraft={setEmailDraft}
         onSendEmail={onSendEmail}
         sendingEmail={sendingEmail}
+        onGenerateCode={onGenerateCode}
         teamMembers={teamMembers}
       />
 

@@ -58,6 +58,7 @@ export default function CrmDrawer({
   emailDraft,
   setEmailDraft,
   sendingEmail,
+  onGenerateCode,
   teamMembers
 }) {
   if (!showDrawer) return null;
@@ -83,8 +84,8 @@ export default function CrmDrawer({
                 </h3>
                 {selectedCustomer?.priority && (
                   <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${selectedCustomer.priority === "high" ? "bg-rose-50 text-rose-600 border-rose-100" :
-                      selectedCustomer.priority === "medium" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                        "bg-slate-50 text-slate-500 border-slate-200"
+                    selectedCustomer.priority === "medium" ? "bg-amber-50 text-amber-600 border-amber-100" :
+                      "bg-slate-50 text-slate-500 border-slate-200"
                     }`}>
                     {selectedCustomer.priority}
                   </span>
@@ -154,7 +155,31 @@ export default function CrmDrawer({
           <div className="px-5 py-4 md:px-8 border-b border-slate-100 bg-white grid grid-cols-3 md:grid-cols-6 gap-4 sticky top-0 z-[11]">
             <div className="space-y-1">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pipeline Stage</p>
-              <CRMStageBadge stage={selectedCustomer?.pipelineStage} />
+              <div className="flex items-center gap-2">
+                <CRMStageBadge stage={selectedCustomer?.pipelineStage} />
+                {selectedCustomer?.isLocked && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-100 text-[8px] font-black uppercase tracking-widest">
+                    <Shield size={10} className="fill-amber-600/20" /> Locked
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Actions</p>
+              {selectedCustomer?.pipelineStage === "won" && !selectedCustomer?.isLocked ? (
+                <button
+                  onClick={() => onGenerateCode(selectedCustomer._id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
+                  <Zap size={10} className="fill-white" /> Generate Code
+                </button>
+              ) : selectedCustomer?.isLocked ? (
+                <div className="text-[9px] font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  {selectedCustomer.generatedCode}
+                </div>
+              ) : (
+                <p className="text-xs font-black text-slate-900">{formatCurrency(selectedCustomer?.leadValue)}</p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Est. Value</p>
@@ -203,8 +228,8 @@ export default function CrmDrawer({
                 key={t.key}
                 onClick={() => setDrawerTab(t.key)}
                 className={`flex-1 flex items-center justify-center gap-2 py-4 px-3 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all min-w-[110px] ${drawerTab === t.key
-                    ? "border-indigo-600 text-indigo-600 bg-indigo-50/10"
-                    : "border-transparent text-slate-400 hover:text-slate-600"
+                  ? "border-indigo-600 text-indigo-600 bg-indigo-50/10"
+                  : "border-transparent text-slate-400 hover:text-slate-600"
                   }`}
               >
                 <t.icon size={12} />
